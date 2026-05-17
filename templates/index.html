@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personalizar Cartones de Bingo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e3e3e3;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            max-width: 1200px;
+            width: 100%;
+            height: 90vh;
+            background-color: #fff;
+            border-radius: 20px;
+            box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .sidebar {
+            background-color: #fe630b;
+            width: 300px;
+            padding: 20px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .sidebar h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .sidebar label {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .sidebar input[type="color"], 
+        .sidebar input[type="number"], 
+        .sidebar select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: none;
+            border-radius: 10px;
+            background-color: white;
+            font-size: 14px;
+        }
+
+        .sidebar input[type="submit"] {
+            background-color: white;
+            color: #fe630b;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: bold;
+        }
+
+        .sidebar input[type="submit"]:hover {
+            background-color: #ff7f24;
+        }
+
+        .content {
+            flex-grow: 1;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #f5f5f5;
+        }
+
+        .carton-preview {
+            width: 320px;
+            height: 380px;
+            background-color: var(--carton-color, #fe630b);
+            border: 3px solid black;
+            padding: 10px;
+            text-align: center;
+            display: grid; 
+            grid-template-rows: auto auto auto;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .carton-preview:hover {
+            transform: scale(1.05);
+        }
+
+        .bingo {
+            font-size: 32px;
+            color: var(--bingo-color, #000000);
+            letter-spacing: 18px;
+        }
+
+        .numeros {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-gap: 5px;
+            margin-top: 10px;
+        }
+
+        .numero {
+            background-color: white;
+            border: 1px solid black;
+            padding: 10px;
+            font-size: 20px;
+            color: black;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .enumeracion {
+            font-size: 16px;
+            margin-top: 20px;
+            color: var(--enumeracion-color, #000000);
+        }
+
+        .preview-container {
+            text-align: center;
+        }
+
+        /* Animaciones para una experiencia más agradable */
+        .sidebar, .carton-preview {
+            animation: fadeIn 1s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Barra lateral de personalización -->
+        <div class="sidebar">
+            <h1>Personaliza tu Cartón</h1>
+            <form action="/" method="POST">
+                <label for="color_carton">Color del Cartón:</label>
+                <input type="color" id="color_carton" name="color_carton" value="#fe630b" oninput="updatePreview()">
+
+                <label for="color_bingo">Color de la palabra BINGO:</label>
+                <input type="color" id="color_bingo" name="color_bingo" value="#000000" oninput="updatePreview()">
+
+                <label for="color_enumeracion">Color de la Enumeración:</label>
+                <input type="color" id="color_enumeracion" name="color_enumeracion" value="#000000" oninput="updatePreview()">
+
+                <label for="version">Selecciona la versión:</label>
+                <select id="version" name="version">
+                    <option value="1.0">Versión 1.0</option>
+                    <option value="2.0">Versión 2.0</option>
+                    <option value="halloween 1.0">Halloween 1.0</option> 
+                    <option value="navidad 2.0">Halloween 2.0</option>
+                    <option value="navidad 1.0">Navidad 1.0</option> 
+                    <option value="navidad 2.0">Navidad 2.0</option>
+                    <option value="1">Imagen Personalizada1</option>
+                    <option value="2">Imagen Personalizada2</option>
+                    <option value="3">Imagen Personalizada3</option>
+                    <option value="4">Imagen Personalizada4</option>
+                </select> 
+
+                <label for="cantidad_paginas">Cantidad de páginas:</label>
+                <input type="number" id="cantidad_paginas" name="cantidad_paginas" value="1" min="1">
+
+                <input type="checkbox" name="text-bg" id="text-bg"> Crear txt de cartones
+
+                <input type="submit" value="Generar PDF" style="margin-top: 20px;">
+            </form>
+        </div>
+
+        <!-- Contenido principal - Previsualización del cartón -->
+        <div class="content">
+            <div class="preview-container">
+                <h2>Vista Previa del Cartón</h2>
+                <div class="carton-preview" id="cartonPreview">
+                    <div class="bingo" id="bingoText">B I N G O</div>
+                    <div class="numeros">
+                        <div class="numero">12</div>
+                        <div class="numero">25</div>
+                        <div class="numero">35</div>
+                        <div class="numero">60</div>
+                        <div class="numero">74</div>
+
+                        <div class="numero">8</div>
+                        <div class="numero">18</div>
+                        <div class="numero">35</div>
+                        <div class="numero">53</div>
+                        <div class="numero">67</div>
+
+                        <div class="numero">2</div>
+                        <div class="numero">29</div>
+                        <div class="numero">BG</div>
+                        <div class="numero">52</div>
+                        <div class="numero">70</div>
+
+                        <div class="numero">5</div>
+                        <div class="numero">20</div>
+                        <div class="numero">45</div>
+                        <div class="numero">56</div>
+                        <div class="numero">63</div>
+
+                        <div class="numero">7</div>
+                        <div class="numero">28</div>
+                        <div class="numero">38</div>
+                        <div class="numero">49</div>
+                        <div class="numero">72</div>
+                    </div>
+                    <div class="enumeracion" id="enumeracionText">Cartón 1</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updatePreview() {
+            const cartonColor = document.getElementById('color_carton').value;
+            const bingoColor = document.getElementById('color_bingo').value;
+            const enumeracionColor = document.getElementById('color_enumeracion').value;
+
+            // Actualizar los colores de la vista previa
+            document.getElementById('cartonPreview').style.setProperty('--carton-color', cartonColor);
+            document.getElementById('bingoText').style.color = bingoColor;
+            document.getElementById('enumeracionText').style.color = enumeracionColor;
+        }
+    </script>
+</body>
+</html>

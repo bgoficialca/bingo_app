@@ -1,0 +1,13 @@
+# Configuración para desplegar en Render.com (https://render.com)
+services:
+  - type: web
+    name: bingo-app
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: RENDER
+        value: "true"
