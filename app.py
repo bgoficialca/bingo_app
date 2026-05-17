@@ -524,7 +524,7 @@ def detectar_ganadores(secuencia_cartones, secuencia_llamados, modos):
 
 def formatear_reporte_ganadores(secuencia_llamados, modos, ganadores):
 
-    """Bloque breve: solo ganadores de la primera bola con acierto."""
+    """Un mensaje por patrón; solo la primera bola con ganadores."""
 
     lineas = ["", "========== GANADORES =========="]
 
@@ -540,11 +540,36 @@ def formatear_reporte_ganadores(secuencia_llamados, modos, ganadores):
 
     num = ganadores[0]["numero_cantado"]
 
-    lineas.append(f"Bola #{bola} (número {num}):")
+    # Agrupar cartones ganadores por nombre de patrón (un mensaje por patrón)
+    por_patron = {}
 
     for g in ganadores:
 
-        lineas.append(f"  {g['nombre_modo']} ganador cartón {g['numero_carton']}")
+        nombre = g["nombre_modo"]
+
+        if nombre not in por_patron:
+
+            por_patron[nombre] = []
+
+        por_patron[nombre].append(g["numero_carton"])
+
+    for nombre, cartones in por_patron.items():
+
+        cartones_unicos = sorted(set(cartones))
+
+        if len(cartones_unicos) == 1:
+
+            lineas.append(
+
+                f"{nombre} ganador cartón {cartones_unicos[0]} (bola #{bola}: {num})"
+
+            )
+
+        else:
+
+            lista = ", ".join(f"cartón {c}" for c in cartones_unicos)
+
+            lineas.append(f"{nombre} ganador {lista} (bola #{bola}: {num})")
 
     lineas.append("")
 
