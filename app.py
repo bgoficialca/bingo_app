@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, send_file
 
 from fpdf import FPDF
 
-from random import sample
+from random import randint, sample
 
 import io
 
@@ -54,6 +54,22 @@ def resolver_nombre_base(texto_usuario):
         return NOMBRE_BASE_DEFAULT
 
     return nombre[:80]
+
+
+def nombre_aleatorio_cartones():
+    """Ejemplo: cartones_BG (4), con número al azar del 1 al 100."""
+    return f"cartones_BG ({randint(1, 100)})"
+
+
+def resolver_nombre_descarga(texto_usuario, incluir_txt):
+    """
+    Con txt activado y sin nombre escrito: cartones_BG (n) al azar.
+    Sin txt o con nombre personalizado: usa resolver_nombre_base.
+    """
+    texto = (texto_usuario or "").strip()
+    if incluir_txt and not texto:
+        return nombre_aleatorio_cartones()
+    return resolver_nombre_base(texto_usuario)
 
 
 # Todas las celdas del cartón 5x5 (columnas B-I-N-G-O, filas 0-4)
@@ -1004,7 +1020,10 @@ def index():
 
         text_bg = request.form.get("text-bg", "off")
 
-        nombre_base = resolver_nombre_base(request.form.get("nombre_archivo", ""))
+        nombre_base = resolver_nombre_descarga(
+            request.form.get("nombre_archivo", ""),
+            text_bg == "on",
+        )
 
         secuencia_cartones = None
 

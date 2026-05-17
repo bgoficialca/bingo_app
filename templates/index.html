@@ -266,7 +266,7 @@
                 <input type="text" name="nombre_archivo" id="nombre_archivo" maxlength="80"
                     placeholder="cartones_BG" value="{{ form.nombre_archivo if form else '' }}">
                 <p class="ayuda" style="margin-top: -8px; margin-bottom: 12px; font-size: 12px; opacity: 0.95;">
-                    Vacío = <strong>cartones_BG</strong>. Mismo nombre en PDF, TXT y ZIP.
+                    Con txt activo y vacío: <strong>cartones_BG (n)</strong> al azar (1-100). Puedes escribir otro nombre.
                 </p>
 
                 <label>
@@ -386,11 +386,21 @@
             }
         }
 
+        function nombreAleatorioCartones() {
+            const n = Math.floor(Math.random() * 100) + 1;
+            return 'cartones_BG (' + n + ')';
+        }
+
         function toggleOpcionesGanadores() {
             const chk = document.getElementById('text-bg');
             const panel = document.getElementById('opciones-ganadores');
+            const campoNombre = document.getElementById('nombre_archivo');
             if (chk.checked) {
                 panel.classList.add('visible');
+                // Al marcar txt, sugerir nombre al azar si el campo está vacío
+                if (!campoNombre.value.trim()) {
+                    campoNombre.value = nombreAleatorioCartones();
+                }
             } else {
                 panel.classList.remove('visible');
             }
