@@ -71,6 +71,41 @@ def hex_a_rgb(hex_color):
     return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
 
 
+def generar_secuencia_cartones(cantidad_paginas):
+    """
+    Genera todos los cartones de una sola vez (una sola tirada aleatoria).
+    PDF y TXT usan esta misma lista para garantizar la misma secuencia y números.
+    """
+    cartones = []
+    for pagina in range(int(cantidad_paginas)):
+        for indice in range(6):
+            cartones.append(
+                {
+                    "numero": pagina * 6 + indice + 1,
+                    "numeros": generar_numeros_bingo(),
+                }
+            )
+    return cartones
+
+
+def carton_a_bloque_txt(numero_carton, numeros_carton):
+    """Arma el bloque de texto de un cartón a partir de los mismos números que el PDF."""
+    bloque = (
+        "---\n\n*Cartón {}*\n| B  | I  | N  | G  | O  |\n|----|----|----|----|----|\n".format(
+            numero_carton
+        )
+    )
+    for fila in range(5):
+        for letra in "BINGO":
+            numero = numeros_carton[letra][fila]
+            if numero == "LOGO":
+                bloque += "|(BG)"
+            else:
+                bloque += "| {:<2} ".format(numero)
+        bloque += "|\n"
+    return bloque
+
+
 def generar_pdf_personalizado(
     color_carton_hex, color_bingo_hex, color_enumeracion_hex, cantidad_paginas, version, text_bg
 ):
@@ -129,19 +164,24 @@ def generar_pdf_personalizado(
     color_carton = hex_a_rgb(color_carton_hex)
     color_bingo = hex_a_rgb(color_bingo_hex)
     color_enumeracion = hex_a_rgb(color_enumeracion_hex)
-    file = ""
+
+    # Una sola secuencia para todo el lote (PDF + TXT siempre coinciden)
+    secuencia_cartones = generar_secuencia_cartones(cantidad_paginas)
+    contenido_txt = ""
+    indice_carton = 0
 
     for pagina in range(int(cantidad_paginas)):
         pdf.add_page()
         pdf.image(watermark_path, 0, 0, 210, 297)
 
         for i in range(6):
+            carton = secuencia_cartones[indice_carton]
+            indice_carton += 1
             x, y = posiciones_cartones[i]
-            numeros_carton = generar_numeros_bingo()
+            numeros_carton = carton["numeros"]
+            numero_carton = carton["numero"]
 
-            file += "---\n\n*Cartón {}*\n| B  | I  | N  | G  | O  |\n|----|----|----|----|----|\n".format(
-                pagina * 6 + i + 1
-            )
+            contenido_txt += carton_a_bloque_txt(numero_carton, numeros_carton)
 
             pdf.set_fill_color(*color_carton)
             pdf.rect(x - 1, y - 1, ancho_carton + 2, alto_carton + 2, style="F")
@@ -170,24 +210,21 @@ def generar_pdf_personalizado(
                         logo_x = x + idx * 15 + 1
                         logo_y = y + 18 + fila * 12 + 1
                         pdf.image(logo_path, logo_x, logo_y, 13, 10)
-                        file += "|(BG)"
                     else:
                         pdf.set_font("ArialBlackItalic", "", 20)
                         pdf.cell(15, 12, str(numero), 1, 0, "C", fill=True)
-                        file += "| {:<2} ".format(numero)
-                file += "|\n"
 
             pdf.set_xy(x, y + alto_carton - 10)
             pdf.set_font("ArialBlackItalic", "", 14)
             pdf.set_text_color(*color_enumeracion)
-            pdf.cell(ancho_carton, 10, f"Cartón {pagina * 6 + i + 1}", 0, 1, "C", fill=False)
+            pdf.cell(ancho_carton, 10, f"Cartón {numero_carton}", 0, 1, "C", fill=False)
 
     txt_path = None
     if text_bg == "on":
-        # Guardar el listado de cartones en texto (se empaquetará con el PDF si aplica)
+        # Mismo contenido que los cartones dibujados en el PDF (misma secuencia)
         txt_path = os.path.join(carpeta_para_guardar(), "cartones_BG.txt")
         with open(txt_path, mode="w", encoding="utf-8") as f:
-            f.write(file)
+            f.write(contenido_txt)
 
     pdf_output = os.path.join(carpeta_para_guardar(), "cartones_BG.pdf")
     pdf.output(pdf_output)
@@ -196,8 +233,8 @@ def generar_pdf_personalizado(
 
 def crear_zip_descarga(pdf_path, txt_path):
     """
-    Crea un ZIP en memoria con el PDF y el TXT para una sola descarga.
-    El navegador descarga un único archivo cartones_BG.zip con ambos dentro.
+    Empaqueta PDF y TXT generados en la misma petición (misma secuencia de cartones).
+    El ZIP es la forma más fiable de bajar ambos a la vez sin regenerar números.
     """
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archivo_zip:
@@ -221,7 +258,7 @@ def index():
             color_carton, color_bingo, color_enumeracion, cantidad_paginas, version, text_bg
         )
 
-        # Con txt activado: un ZIP con PDF + TXT; si no, solo el PDF
+        # ZIP: PDF y TXT de la misma generación (mismos cartones en el mismo orden)
         if txt_path and os.path.isfile(txt_path):
             zip_buffer = crear_zip_descarga(pdf_path, txt_path)
             return send_file(
