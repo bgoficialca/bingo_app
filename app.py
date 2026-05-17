@@ -446,11 +446,11 @@ def detectar_ganadores(secuencia_cartones, secuencia_llamados, modos):
 
     """
 
-    Simula la secuencia y devuelve solo los ganadores de la primera bola
+    Por cada patrón por separado: primera bola en que ese patrón tiene ganador
 
-    en la que alguien gana (todos los cartones/modos que ganen en esa misma bola).
+    y todos los cartones que ganaron ese patrón en esa misma bola.
 
-  """
+    """
 
     estados = []
 
@@ -474,11 +474,15 @@ def detectar_ganadores(secuencia_cartones, secuencia_llamados, modos):
 
     ya_registrado = set()
 
+    modos_con_resultado = set()
+
+    resultados_por_modo = {}
+
 
 
     for indice_bola, numero in enumerate(secuencia_llamados, start=1):
 
-        ganadores_en_bola = []
+        ganadores_en_bola = {}
 
         for estado in estados:
 
@@ -486,7 +490,13 @@ def detectar_ganadores(secuencia_cartones, secuencia_llamados, modos):
 
             for modo in modos:
 
-                clave = (estado["numero"], modo["nombre"])
+                nombre = modo["nombre"]
+
+                if nombre in modos_con_resultado:
+
+                    continue
+
+                clave = (estado["numero"], nombre)
 
                 if clave in ya_registrado:
 
@@ -494,29 +504,63 @@ def detectar_ganadores(secuencia_cartones, secuencia_llamados, modos):
 
                 if patron_cumplido(estado["marcadas"], modo["celdas"]):
 
-                    ganadores_en_bola.append(
+                    if nombre not in ganadores_en_bola:
 
-                        {
+                        ganadores_en_bola[nombre] = []
 
-                            "nombre_modo": modo["nombre"],
-
-                            "numero_carton": estado["numero"],
-
-                            "bola": indice_bola,
-
-                            "numero_cantado": numero,
-
-                        }
-
-                    )
+                    ganadores_en_bola[nombre].append(estado["numero"])
 
                     ya_registrado.add(clave)
 
-        if ganadores_en_bola:
+        for nombre, cartones in ganadores_en_bola.items():
 
-            return ganadores_en_bola
+            if nombre not in modos_con_resultado:
 
-    return []
+                resultados_por_modo[nombre] = {
+
+                    "bola": indice_bola,
+
+                    "numero_cantado": numero,
+
+                    "cartones": cartones,
+
+                }
+
+                modos_con_resultado.add(nombre)
+
+
+
+    ganadores = []
+
+    for modo in modos:
+
+        nombre = modo["nombre"]
+
+        if nombre not in resultados_por_modo:
+
+            continue
+
+        r = resultados_por_modo[nombre]
+
+        for carton in r["cartones"]:
+
+            ganadores.append(
+
+                {
+
+                    "nombre_modo": nombre,
+
+                    "numero_carton": carton,
+
+                    "bola": r["bola"],
+
+                    "numero_cantado": r["numero_cantado"],
+
+                }
+
+            )
+
+    return ganadores
 
 
 
@@ -524,7 +568,7 @@ def detectar_ganadores(secuencia_cartones, secuencia_llamados, modos):
 
 def formatear_reporte_ganadores(secuencia_llamados, modos, ganadores):
 
-    """Un mensaje por patrón; solo la primera bola con ganadores."""
+    """Un mensaje por patrón, cada uno con su propia bola de victoria."""
 
     lineas = ["", "========== GANADORES =========="]
 
@@ -536,11 +580,6 @@ def formatear_reporte_ganadores(secuencia_llamados, modos, ganadores):
 
         return "\n".join(lineas)
 
-    bola = ganadores[0]["bola"]
-
-    num = ganadores[0]["numero_cantado"]
-
-    # Agrupar cartones ganadores por nombre de patrón (un mensaje por patrón)
     por_patron = {}
 
     for g in ganadores:
@@ -549,13 +588,35 @@ def formatear_reporte_ganadores(secuencia_llamados, modos, ganadores):
 
         if nombre not in por_patron:
 
-            por_patron[nombre] = []
+            por_patron[nombre] = {
 
-        por_patron[nombre].append(g["numero_carton"])
+                "bola": g["bola"],
 
-    for nombre, cartones in por_patron.items():
+                "numero_cantado": g["numero_cantado"],
 
-        cartones_unicos = sorted(set(cartones))
+                "cartones": [],
+
+            }
+
+        por_patron[nombre]["cartones"].append(g["numero_carton"])
+
+    for modo in modos:
+
+        nombre = modo["nombre"]
+
+        if nombre not in por_patron:
+
+            lineas.append(f"{nombre}: sin ganador en esta secuencia.")
+
+            continue
+
+        info = por_patron[nombre]
+
+        bola = info["bola"]
+
+        num = info["numero_cantado"]
+
+        cartones_unicos = sorted(set(info["cartones"]))
 
         if len(cartones_unicos) == 1:
 
