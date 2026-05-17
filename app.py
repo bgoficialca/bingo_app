@@ -1,8 +1,10 @@
 from flask import Flask, render_template, request, send_file
 from fpdf import FPDF
 from random import sample
+import io
 import os
 import tempfile
+import zipfile
 
 app = Flask(__name__)
 
@@ -180,14 +182,29 @@ def generar_pdf_personalizado(
             pdf.set_text_color(*color_enumeracion)
             pdf.cell(ancho_carton, 10, f"Cartón {pagina * 6 + i + 1}", 0, 1, "C", fill=False)
 
+    txt_path = None
     if text_bg == "on":
+        # Guardar el listado de cartones en texto (se empaquetará con el PDF si aplica)
         txt_path = os.path.join(carpeta_para_guardar(), "cartones_BG.txt")
         with open(txt_path, mode="w", encoding="utf-8") as f:
             f.write(file)
 
     pdf_output = os.path.join(carpeta_para_guardar(), "cartones_BG.pdf")
     pdf.output(pdf_output)
-    return pdf_output
+    return pdf_output, txt_path
+
+
+def crear_zip_descarga(pdf_path, txt_path):
+    """
+    Crea un ZIP en memoria con el PDF y el TXT para una sola descarga.
+    El navegador descarga un único archivo cartones_BG.zip con ambos dentro.
+    """
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archivo_zip:
+        archivo_zip.write(pdf_path, "cartones_BG.pdf")
+        archivo_zip.write(txt_path, "cartones_BG.txt")
+    buffer.seek(0)
+    return buffer
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -200,9 +217,20 @@ def index():
         version = request.form.get("version", "1.0")
         text_bg = request.form.get("text-bg", "off")
 
-        pdf_path = generar_pdf_personalizado(
+        pdf_path, txt_path = generar_pdf_personalizado(
             color_carton, color_bingo, color_enumeracion, cantidad_paginas, version, text_bg
         )
+
+        # Con txt activado: un ZIP con PDF + TXT; si no, solo el PDF
+        if txt_path and os.path.isfile(txt_path):
+            zip_buffer = crear_zip_descarga(pdf_path, txt_path)
+            return send_file(
+                zip_buffer,
+                mimetype="application/zip",
+                as_attachment=True,
+                download_name="cartones_BG.zip",
+            )
+
         return send_file(pdf_path, as_attachment=True, download_name="cartones_BG.pdf")
 
     return render_template("index.html")
