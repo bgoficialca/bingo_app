@@ -262,6 +262,13 @@
                 <input type="number" id="cantidad_paginas" name="cantidad_paginas"
                     value="{{ form.cantidad_paginas if form else '1' }}" min="1">
 
+                <label for="nombre_archivo">Nombre del archivo (opcional):</label>
+                <input type="text" name="nombre_archivo" id="nombre_archivo" maxlength="80"
+                    placeholder="cartones_BG" value="{{ form.nombre_archivo if form else '' }}">
+                <p class="ayuda" style="margin-top: -8px; margin-bottom: 12px; font-size: 12px; opacity: 0.95;">
+                    Vacío = <strong>cartones_BG</strong>. Mismo nombre en PDF, TXT y ZIP.
+                </p>
+
                 <label>
                     <input type="checkbox" name="text-bg" id="text-bg"
                         {% if form and form.text_bg_checked %}checked{% endif %}>

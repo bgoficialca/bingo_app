@@ -8,6 +8,8 @@ import io
 
 import os
 
+import re
+
 import tempfile
 
 import zipfile
@@ -32,6 +34,26 @@ FONTS_DIR = os.path.join(BASE_DIR, "fonts")
 
 USAR_TEMPORAL = bool(os.environ.get("VERCEL") or os.environ.get("RENDER"))
 
+NOMBRE_BASE_DEFAULT = "cartones_BG"
+
+
+def resolver_nombre_base(texto_usuario):
+    """Nombre opcional para PDF, TXT y ZIP; vacío = cartones_BG."""
+    if not texto_usuario or not str(texto_usuario).strip():
+        return NOMBRE_BASE_DEFAULT
+
+    nombre = str(texto_usuario).strip()
+    for extension in (".pdf", ".txt", ".zip"):
+        if nombre.lower().endswith(extension):
+            nombre = nombre[: -len(extension)]
+
+    nombre = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", nombre)
+    nombre = nombre.strip().strip(".")
+
+    if not nombre:
+        return NOMBRE_BASE_DEFAULT
+
+    return nombre[:80]
 
 
 # Todas las celdas del cartón 5x5 (columnas B-I-N-G-O, filas 0-4)
@@ -658,6 +680,8 @@ def generar_pdf_personalizado(
 
     bloque_ganadores="",
 
+    nombre_base=NOMBRE_BASE_DEFAULT,
+
 ):
 
     pdf = FPDF("P", "mm", "A4")
@@ -888,7 +912,7 @@ def generar_pdf_personalizado(
 
         contenido_txt += bloque_ganadores
 
-        txt_path = os.path.join(carpeta_para_guardar(), "cartones_BG.txt")
+        txt_path = os.path.join(carpeta_para_guardar(), f"{nombre_base}.txt")
 
         with open(txt_path, mode="w", encoding="utf-8") as f:
 
@@ -896,27 +920,27 @@ def generar_pdf_personalizado(
 
 
 
-    pdf_output = os.path.join(carpeta_para_guardar(), "cartones_BG.pdf")
+    pdf_output = os.path.join(carpeta_para_guardar(), f"{nombre_base}.pdf")
 
     pdf.output(pdf_output)
 
-    return pdf_output, txt_path
+    return pdf_output, txt_path, nombre_base
 
 
 
 
 
-def crear_zip_descarga(pdf_path, txt_path):
+def crear_zip_descarga(pdf_path, txt_path, nombre_base):
 
-    """Empaqueta PDF y TXT de la misma generación (misma secuencia de cartones)."""
+    """Empaqueta PDF y TXT con el mismo nombre base que el archivo ZIP."""
 
     buffer = io.BytesIO()
 
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archivo_zip:
 
-        archivo_zip.write(pdf_path, "cartones_BG.pdf")
+        archivo_zip.write(pdf_path, f"{nombre_base}.pdf")
 
-        archivo_zip.write(txt_path, "cartones_BG.txt")
+        archivo_zip.write(txt_path, f"{nombre_base}.txt")
 
     buffer.seek(0)
 
@@ -954,6 +978,8 @@ def _form_a_dict():
 
         "text_bg_checked": request.form.get("text-bg") == "on",
 
+        "nombre_archivo": request.form.get("nombre_archivo", ""),
+
     }
 
 
@@ -978,7 +1004,7 @@ def index():
 
         text_bg = request.form.get("text-bg", "off")
 
-
+        nombre_base = resolver_nombre_base(request.form.get("nombre_archivo", ""))
 
         secuencia_cartones = None
 
@@ -1040,7 +1066,7 @@ def index():
 
 
 
-        pdf_path, txt_path = generar_pdf_personalizado(
+        pdf_path, txt_path, nombre_base = generar_pdf_personalizado(
 
             color_carton,
 
@@ -1058,13 +1084,15 @@ def index():
 
             bloque_ganadores=bloque_ganadores,
 
+            nombre_base=nombre_base,
+
         )
 
 
 
         if txt_path and os.path.isfile(txt_path):
 
-            zip_buffer = crear_zip_descarga(pdf_path, txt_path)
+            zip_buffer = crear_zip_descarga(pdf_path, txt_path, nombre_base)
 
             return send_file(
 
@@ -1074,13 +1102,13 @@ def index():
 
                 as_attachment=True,
 
-                download_name="cartones_BG.zip",
+                download_name=f"{nombre_base}.zip",
 
             )
 
 
 
-        return send_file(pdf_path, as_attachment=True, download_name="cartones_BG.pdf")
+        return send_file(pdf_path, as_attachment=True, download_name=f"{nombre_base}.pdf")
 
 
 
