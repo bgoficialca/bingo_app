@@ -11,8 +11,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 FONTS_DIR = os.path.join(BASE_DIR, "fonts")
 
-# Render y otros hosts exponen PORT; en la nube el PDF se guarda en carpeta temporal
-USAR_TEMPORAL = bool(os.environ.get("RENDER") or os.environ.get("PORT"))
+# En Vercel/Render el disco es efímero; el PDF se guarda en carpeta temporal
+USAR_TEMPORAL = bool(os.environ.get("VERCEL") or os.environ.get("RENDER"))
 
 
 def ruta_estatica(nombre_archivo):
