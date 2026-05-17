@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,17 +10,18 @@
             background-color: #e3e3e3;
             margin: 0;
             padding: 0;
+            min-height: 100vh;
             display: flex;
             justify-content: center;
-            align-items: center;
-            height: 100vh;
+            align-items: stretch;
         }
 
         .container {
             display: flex;
-            max-width: 1200px;
+            max-width: 1280px;
             width: 100%;
-            height: 90vh;
+            min-height: 100vh;
+            margin: 10px;
             background-color: #fff;
             border-radius: 20px;
             box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.2);
@@ -29,51 +30,140 @@
 
         .sidebar {
             background-color: #fe630b;
-            width: 300px;
+            width: 380px;
+            min-width: 320px;
             padding: 20px;
             color: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            overflow-y: auto;
+            max-height: 100vh;
+            box-sizing: border-box;
         }
 
         .sidebar h1 {
-            font-size: 24px;
-            margin-bottom: 20px;
+            font-size: 22px;
+            margin-bottom: 16px;
             text-align: center;
         }
 
         .sidebar label {
-            font-size: 16px;
-            margin-bottom: 10px;
+            font-size: 14px;
+            margin-bottom: 6px;
+            display: block;
         }
 
-        .sidebar input[type="color"], 
-        .sidebar input[type="number"], 
-        .sidebar select {
+        .sidebar input[type="color"],
+        .sidebar input[type="number"],
+        .sidebar input[type="text"],
+        .sidebar select,
+        .sidebar textarea {
             width: 100%;
-            padding: 10px;
-            margin-bottom: 20px;
+            padding: 8px;
+            margin-bottom: 12px;
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             background-color: white;
             font-size: 14px;
+            box-sizing: border-box;
+            color: #333;
+        }
+
+        .sidebar textarea {
+            min-height: 60px;
+            resize: vertical;
         }
 
         .sidebar input[type="submit"] {
             background-color: white;
             color: #fe630b;
-            padding: 15px;
+            padding: 14px;
             border: none;
             border-radius: 10px;
-            font-size: 18px;
+            font-size: 16px;
             cursor: pointer;
-            transition: background-color 0.3s;
             font-weight: bold;
+            width: 100%;
         }
 
         .sidebar input[type="submit"]:hover {
-            background-color: #ff7f24;
+            background-color: #ffe8dc;
+        }
+
+        .alerta-error {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 14px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .opciones-ganadores {
+            background: rgba(0, 0, 0, 0.12);
+            border-radius: 10px;
+            padding: 12px;
+            margin: 12px 0;
+            display: none;
+        }
+
+        .opciones-ganadores.visible {
+            display: block;
+        }
+
+        .opciones-ganadores h3 {
+            font-size: 15px;
+            margin: 0 0 10px 0;
+        }
+
+        .opciones-ganadores p.ayuda {
+            font-size: 12px;
+            margin: 0 0 10px 0;
+            opacity: 0.95;
+        }
+
+        .patron-bloque {
+            margin-bottom: 16px;
+        }
+
+        .patron-encabezado {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 3px;
+            margin-bottom: 4px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .patron-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 3px;
+        }
+
+        .celda-patron {
+            aspect-ratio: 1;
+            background: white;
+            color: #333;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        .celda-patron.activa {
+            background: #2d6a4f;
+            color: white;
+            border-color: #1b4332;
+        }
+
+        .celda-patron.centro {
+            font-weight: bold;
         }
 
         .content {
@@ -93,15 +183,10 @@
             border: 3px solid black;
             padding: 10px;
             text-align: center;
-            display: grid; 
+            display: grid;
             grid-template-rows: auto auto auto;
             border-radius: 15px;
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease;
-        }
-
-        .carton-preview:hover {
-            transform: scale(1.05);
         }
 
         .bingo {
@@ -134,102 +219,104 @@
             margin-top: 20px;
             color: var(--enumeracion-color, #000000);
         }
-
-        .preview-container {
-            text-align: center;
-        }
-
-        /* Animaciones para una experiencia más agradable */
-        .sidebar, .carton-preview {
-            animation: fadeIn 1s ease;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Barra lateral de personalización -->
         <div class="sidebar">
             <h1>Personaliza tu Cartón</h1>
-            <form action="/" method="POST">
+
+            {% if error %}
+            <div class="alerta-error" role="alert">{{ error }}</div>
+            {% endif %}
+
+            <form action="/" method="POST" id="form-bingo">
                 <label for="color_carton">Color del Cartón:</label>
-                <input type="color" id="color_carton" name="color_carton" value="#fe630b" oninput="updatePreview()">
+                <input type="color" id="color_carton" name="color_carton"
+                    value="{{ form.color_carton if form else '#fe630b' }}" oninput="updatePreview()">
 
                 <label for="color_bingo">Color de la palabra BINGO:</label>
-                <input type="color" id="color_bingo" name="color_bingo" value="#000000" oninput="updatePreview()">
+                <input type="color" id="color_bingo" name="color_bingo"
+                    value="{{ form.color_bingo if form else '#000000' }}" oninput="updatePreview()">
 
                 <label for="color_enumeracion">Color de la Enumeración:</label>
-                <input type="color" id="color_enumeracion" name="color_enumeracion" value="#000000" oninput="updatePreview()">
+                <input type="color" id="color_enumeracion" name="color_enumeracion"
+                    value="{{ form.color_enumeracion if form else '#000000' }}" oninput="updatePreview()">
 
                 <label for="version">Selecciona la versión:</label>
                 <select id="version" name="version">
-                    <option value="1.0">Versión 1.0</option>
-                    <option value="2.0">Versión 2.0</option>
-                    <option value="halloween 1.0">Halloween 1.0</option> 
-                    <option value="navidad 2.0">Halloween 2.0</option>
-                    <option value="navidad 1.0">Navidad 1.0</option> 
-                    <option value="navidad 2.0">Navidad 2.0</option>
-                    <option value="1">Imagen Personalizada1</option>
-                    <option value="2">Imagen Personalizada2</option>
-                    <option value="3">Imagen Personalizada3</option>
-                    <option value="4">Imagen Personalizada4</option>
-                </select> 
+                    {% set vsel = form.version if form else '1.0' %}
+                    <option value="1.0" {% if vsel == '1.0' %}selected{% endif %}>Versión 1.0</option>
+                    <option value="2.0" {% if vsel == '2.0' %}selected{% endif %}>Versión 2.0</option>
+                    <option value="halloween 1.0" {% if vsel == 'halloween 1.0' %}selected{% endif %}>Halloween 1.0</option>
+                    <option value="navidad 2.0" {% if vsel == 'navidad 2.0' %}selected{% endif %}>Halloween 2.0</option>
+                    <option value="navidad 1.0" {% if vsel == 'navidad 1.0' %}selected{% endif %}>Navidad 1.0</option>
+                    <option value="navidad 2.0" {% if vsel == 'navidad 2.0' %}selected{% endif %}>Navidad 2.0</option>
+                    <option value="1" {% if vsel == '1' %}selected{% endif %}>Imagen Personalizada1</option>
+                    <option value="2" {% if vsel == '2' %}selected{% endif %}>Imagen Personalizada2</option>
+                    <option value="3" {% if vsel == '3' %}selected{% endif %}>Imagen Personalizada3</option>
+                    <option value="4" {% if vsel == '4' %}selected{% endif %}>Imagen Personalizada4</option>
+                </select>
 
                 <label for="cantidad_paginas">Cantidad de páginas:</label>
-                <input type="number" id="cantidad_paginas" name="cantidad_paginas" value="1" min="1">
+                <input type="number" id="cantidad_paginas" name="cantidad_paginas"
+                    value="{{ form.cantidad_paginas if form else '1' }}" min="1">
 
-                <input type="checkbox" name="text-bg" id="text-bg"> Crear txt de cartones
+                <label>
+                    <input type="checkbox" name="text-bg" id="text-bg"
+                        {% if form and form.text_bg_checked %}checked{% endif %}>
+                    Crear txt de cartones y detectar ganadores
+                </label>
 
-                <input type="submit" value="Generar PDF" style="margin-top: 20px;">
+                <div id="opciones-ganadores" class="opciones-ganadores">
+                    <h3>Ganadores (misma secuencia para todas las formas)</h3>
+                    <p class="ayuda">Secuencia de bolas cantadas (solo números, separados por coma):</p>
+                    <textarea name="secuencia_numeros" id="secuencia_numeros" placeholder="1, 2, 3, 4, 15, 32...">{{ form.secuencia_numeros if form else '' }}</textarea>
+
+                    <div class="patron-bloque">
+                        <label for="nombre_patron1">Nombre cuadrícula 1 (obligatorio si marcas casillas):</label>
+                        <input type="text" name="nombre_patron1" id="nombre_patron1" maxlength="40"
+                            placeholder="Ej: linea" value="{{ form.nombre_patron1 if form else '' }}">
+                        <input type="hidden" name="patron1_celdas" id="patron1_celdas"
+                            value="{{ form.patron1_celdas if form else '' }}">
+                        <p class="ayuda">Marca las casillas que deben llenarse (mismo orden B-I-N-G-O que el cartón). Vacío = no cuenta.</p>
+                        <div class="patron-encabezado">
+                            <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+                        </div>
+                        <div class="patron-grid" id="grid-patron1" data-patron="1"></div>
+                    </div>
+
+                    <div class="patron-bloque">
+                        <label for="nombre_patron2">Nombre cuadrícula 2 (obligatorio si marcas casillas):</label>
+                        <input type="text" name="nombre_patron2" id="nombre_patron2" maxlength="40"
+                            placeholder="Ej: esquinas" value="{{ form.nombre_patron2 if form else '' }}">
+                        <input type="hidden" name="patron2_celdas" id="patron2_celdas"
+                            value="{{ form.patron2_celdas if form else '' }}">
+                        <p class="ayuda">Cuadrícula 2 vacía = solo cuenta la 1 y cartón lleno.</p>
+                        <div class="patron-encabezado">
+                            <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+                        </div>
+                        <div class="patron-grid" id="grid-patron2" data-patron="2"></div>
+                    </div>
+
+                    <p class="ayuda"><strong>3.ª forma:</strong> cartón lleno (siempre activa). La casilla libre (centro) ya cuenta marcada.</p>
+                </div>
+
+                <input type="submit" value="Generar PDF" style="margin-top: 16px;">
             </form>
         </div>
 
-        <!-- Contenido principal - Previsualización del cartón -->
         <div class="content">
             <div class="preview-container">
                 <h2>Vista Previa del Cartón</h2>
                 <div class="carton-preview" id="cartonPreview">
                     <div class="bingo" id="bingoText">B I N G O</div>
                     <div class="numeros">
-                        <div class="numero">12</div>
-                        <div class="numero">25</div>
-                        <div class="numero">35</div>
-                        <div class="numero">60</div>
-                        <div class="numero">74</div>
-
-                        <div class="numero">8</div>
-                        <div class="numero">18</div>
-                        <div class="numero">35</div>
-                        <div class="numero">53</div>
-                        <div class="numero">67</div>
-
-                        <div class="numero">2</div>
-                        <div class="numero">29</div>
-                        <div class="numero">BG</div>
-                        <div class="numero">52</div>
-                        <div class="numero">70</div>
-
-                        <div class="numero">5</div>
-                        <div class="numero">20</div>
-                        <div class="numero">45</div>
-                        <div class="numero">56</div>
-                        <div class="numero">63</div>
-
-                        <div class="numero">7</div>
-                        <div class="numero">28</div>
-                        <div class="numero">38</div>
-                        <div class="numero">49</div>
-                        <div class="numero">72</div>
+                        <div class="numero">12</div><div class="numero">25</div><div class="numero">35</div><div class="numero">60</div><div class="numero">74</div>
+                        <div class="numero">8</div><div class="numero">18</div><div class="numero">35</div><div class="numero">53</div><div class="numero">67</div>
+                        <div class="numero">2</div><div class="numero">29</div><div class="numero">BG</div><div class="numero">52</div><div class="numero">70</div>
+                        <div class="numero">5</div><div class="numero">20</div><div class="numero">45</div><div class="numero">56</div><div class="numero">63</div>
+                        <div class="numero">7</div><div class="numero">28</div><div class="numero">38</div><div class="numero">49</div><div class="numero">72</div>
                     </div>
                     <div class="enumeracion" id="enumeracionText">Cartón 1</div>
                 </div>
@@ -238,16 +325,76 @@
     </div>
 
     <script>
-        function updatePreview() {
-            const cartonColor = document.getElementById('color_carton').value;
-            const bingoColor = document.getElementById('color_bingo').value;
-            const enumeracionColor = document.getElementById('color_enumeracion').value;
+        const LETRAS = ['B', 'I', 'N', 'G', 'O'];
 
-            // Actualizar los colores de la vista previa
-            document.getElementById('cartonPreview').style.setProperty('--carton-color', cartonColor);
-            document.getElementById('bingoText').style.color = bingoColor;
-            document.getElementById('enumeracionText').style.color = enumeracionColor;
+        function updatePreview() {
+            document.getElementById('cartonPreview').style.setProperty('--carton-color', document.getElementById('color_carton').value);
+            document.getElementById('bingoText').style.color = document.getElementById('color_bingo').value;
+            document.getElementById('enumeracionText').style.color = document.getElementById('color_enumeracion').value;
         }
+
+        function crearCuadriculaPatron(contenedorId, hiddenId) {
+            const contenedor = document.getElementById(contenedorId);
+            const hidden = document.getElementById(hiddenId);
+            const seleccionadas = new Set();
+
+            if (hidden.value) {
+                hidden.value.split(';').forEach(par => {
+                    const p = par.trim();
+                    if (p) seleccionadas.add(p);
+                });
+            }
+
+            for (let fila = 0; fila < 5; fila++) {
+                for (let col = 0; col < 5; col++) {
+                    const celda = document.createElement('button');
+                    celda.type = 'button';
+                    celda.className = 'celda-patron';
+                    celda.dataset.fila = fila;
+                    celda.dataset.col = col;
+                    const clave = fila + ',' + col;
+
+                    if (fila === 2 && col === 2) {
+                        celda.textContent = 'BG';
+                        celda.classList.add('centro');
+                    }
+
+                    if (seleccionadas.has(clave)) {
+                        celda.classList.add('activa');
+                    }
+
+                    celda.addEventListener('click', () => {
+                        if (celda.classList.contains('activa')) {
+                            celda.classList.remove('activa');
+                            seleccionadas.delete(clave);
+                        } else {
+                            celda.classList.add('activa');
+                            seleccionadas.add(clave);
+                        }
+                        hidden.value = Array.from(seleccionadas).join(';');
+                    });
+
+                    contenedor.appendChild(celda);
+                }
+            }
+        }
+
+        function toggleOpcionesGanadores() {
+            const chk = document.getElementById('text-bg');
+            const panel = document.getElementById('opciones-ganadores');
+            if (chk.checked) {
+                panel.classList.add('visible');
+            } else {
+                panel.classList.remove('visible');
+            }
+        }
+
+        document.getElementById('text-bg').addEventListener('change', toggleOpcionesGanadores);
+
+        crearCuadriculaPatron('grid-patron1', 'patron1_celdas');
+        crearCuadriculaPatron('grid-patron2', 'patron2_celdas');
+        toggleOpcionesGanadores();
+        updatePreview();
     </script>
 </body>
 </html>
