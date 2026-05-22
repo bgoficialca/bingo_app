@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados — {{ nombre_base }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='bingo.css') }}">
+</head>
+<body>
+    <div class="pagina">
+        <header class="encabezado-app">
+            <h1>Resultados del bingo</h1>
+        </header>
+
+        <div class="tarjeta resultados-cuerpo">
+            <h2 class="resumen-titulo">Ganadores encontrados</h2>
+            <p class="resumen-sub">
+                Se generaron <strong>{{ resumen.total_cartones }}</strong> cartones.
+                Secuencia analizada: {{ resumen.secuencia_texto }}
+            </p>
+
+            {% if resumen.hay_ganadores %}
+            <div class="lista-patrones">
+                {% for patron in resumen.patrones %}
+                <article class="tarjeta-patron {% if patron.tiene_ganador %}gano{% else %}no-gano{% endif %}">
+                    <h3 class="nombre-patron">{{ patron.nombre }}</h3>
+
+                    {% if patron.tiene_ganador %}
+                    <p style="margin:0 0 6px; font-size:0.95rem;">Bola ganadora:</p>
+                    <div class="bola-destacada">{{ patron.bola_etiqueta }}</div>
+                    <p class="cartones-ganadores">
+                        {% if patron.un_carton %}
+                        Ganador: <strong>Cartón {{ patron.cartones[0] }}</strong>
+                        {% else %}
+                        Ganadores:
+                        {% for c in patron.cartones %}
+                        <strong>Cartón {{ c }}</strong>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                        {% endif %}
+                    </p>
+                    <p style="margin:8px 0 0; font-size:0.85rem; color:#555;">
+                        (Posición {{ patron.bola_posicion }} en tu secuencia)
+                    </p>
+                    {% else %}
+                    <p class="cartones-ganadores" style="color:#666;">
+                        Nadie ganó con esta forma en la secuencia indicada.
+                    </p>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="sin-ganadores-global">
+                No hubo ganadores con la secuencia y patrones configurados.
+            </div>
+            {% endif %}
+
+            <div class="zona-descarga">
+                <p>¿Deseas descargar el PDF de los cartones?</p>
+                <a href="{{ url_for('descargar', token=token) }}" class="btn-descargar">
+                    Sí, descargar {{ nombre_base }}.pdf
+                </a>
+                <br>
+                <a href="{{ url_for('index') }}" class="btn-volver">← Volver y generar otra tanda</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

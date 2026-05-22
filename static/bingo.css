@@ -1,0 +1,388 @@
+:root {
+    --naranja: #fe630b;
+    --naranja-oscuro: #d95409;
+    --fondo: #ececec;
+    --tarjeta: #ffffff;
+    --texto: #1a1a1a;
+    --ok: #1b6b3a;
+    --ok-fondo: #e8f5ec;
+    --sin: #666;
+    --sin-fondo: #f4f4f4;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--fondo);
+    color: var(--texto);
+    margin: 0;
+    min-height: 100vh;
+}
+
+.pagina {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 12px;
+}
+
+.encabezado-app {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.encabezado-app h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--naranja);
+}
+
+.layout-principal {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+@media (min-width: 900px) {
+    .layout-principal {
+        grid-template-columns: minmax(320px, 400px) 1fr;
+        align-items: start;
+    }
+}
+
+.tarjeta {
+    background: var(--tarjeta);
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.panel-formulario {
+    background: var(--naranja);
+    color: #fff;
+    padding: 20px;
+}
+
+.panel-formulario label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.panel-formulario input[type="color"],
+.panel-formulario input[type="number"],
+.panel-formulario input[type="text"],
+.panel-formulario select,
+.panel-formulario textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--texto);
+}
+
+.panel-formulario textarea {
+    min-height: 72px;
+    resize: vertical;
+}
+
+.fila-nombre {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.fila-nombre input {
+    flex: 1;
+    margin-bottom: 0 !important;
+}
+
+.btn-secundario {
+    background: #fff;
+    color: var(--naranja);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 0.85rem;
+}
+
+.btn-secundario:hover {
+    background: #ffe8dc;
+}
+
+.btn-principal {
+    width: 100%;
+    background: #fff;
+    color: var(--naranja);
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+    margin-top: 8px;
+}
+
+.btn-principal:hover {
+    background: #fff5f0;
+}
+
+.check-linea {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.check-linea input {
+    width: auto;
+    margin: 0;
+}
+
+.ayuda {
+    font-size: 0.8rem;
+    opacity: 0.95;
+    margin: -6px 0 12px;
+    line-height: 1.35;
+}
+
+.alerta-error {
+    background: #fff3cd;
+    color: #856404;
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 14px;
+    font-size: 0.9rem;
+}
+
+.opciones-ganadores {
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 12px;
+    padding: 14px;
+    margin: 12px 0;
+    display: none;
+}
+
+.opciones-ganadores.visible {
+    display: block;
+}
+
+.opciones-ganadores h3 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+}
+
+.patron-bloque {
+    margin-bottom: 14px;
+}
+
+.patron-encabezado,
+.patron-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+}
+
+.patron-encabezado {
+    text-align: center;
+    font-weight: 800;
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+}
+
+.celda-patron {
+    aspect-ratio: 1;
+    background: #fff;
+    color: #333;
+    border: 2px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.celda-patron.activa {
+    background: var(--ok);
+    color: #fff;
+    border-color: #14532d;
+}
+
+.panel-preview {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+}
+
+.panel-preview h2 {
+    margin: 0 0 16px;
+    font-size: 1.1rem;
+    color: #444;
+}
+
+.carton-preview {
+    width: min(100%, 300px);
+    background: var(--carton-color, var(--naranja));
+    border: 3px solid #111;
+    border-radius: 14px;
+    padding: 10px;
+    text-align: center;
+}
+
+.carton-preview .bingo {
+    font-size: 1.6rem;
+    letter-spacing: 0.35em;
+    font-weight: 800;
+}
+
+.carton-preview .numeros {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.carton-preview .numero {
+    background: #fff;
+    border: 1px solid #111;
+    border-radius: 6px;
+    padding: 8px 2px;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.carton-preview .enumeracion {
+    margin-top: 12px;
+    font-weight: 700;
+}
+
+/* Página resultados */
+.resultados-cuerpo {
+    padding: 20px;
+}
+
+.resumen-titulo {
+    font-size: 1.35rem;
+    margin: 0 0 8px;
+    color: var(--naranja);
+}
+
+.resumen-sub {
+    color: #555;
+    margin: 0 0 20px;
+    font-size: 0.95rem;
+}
+
+.lista-patrones {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.tarjeta-patron {
+    border-radius: 12px;
+    padding: 16px;
+    border: 2px solid transparent;
+}
+
+.tarjeta-patron.gano {
+    background: var(--ok-fondo);
+    border-color: #86c99a;
+}
+
+.tarjeta-patron.no-gano {
+    background: var(--sin-fondo);
+    border-color: #ddd;
+}
+
+.tarjeta-patron .nombre-patron {
+    font-size: 1.15rem;
+    font-weight: 800;
+    margin: 0 0 8px;
+}
+
+.tarjeta-patron.gano .nombre-patron {
+    color: var(--ok);
+}
+
+.bola-destacada {
+    display: inline-block;
+    background: var(--naranja);
+    color: #fff;
+    font-weight: 900;
+    font-size: 1.25rem;
+    padding: 6px 14px;
+    border-radius: 8px;
+    margin: 4px 0 10px;
+}
+
+.cartones-ganadores {
+    font-size: 1.05rem;
+    line-height: 1.5;
+}
+
+.cartones-ganadores strong {
+    color: var(--texto);
+}
+
+.zona-descarga {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 2px dashed #ddd;
+    text-align: center;
+}
+
+.zona-descarga p {
+    margin: 0 0 14px;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.btn-descargar {
+    display: inline-block;
+    background: var(--naranja);
+    color: #fff;
+    text-decoration: none;
+    padding: 16px 28px;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    box-shadow: 0 4px 14px rgba(254, 99, 11, 0.35);
+}
+
+.btn-descargar:hover {
+    background: var(--naranja-oscuro);
+}
+
+.btn-volver {
+    display: inline-block;
+    margin-top: 14px;
+    color: #555;
+    text-decoration: none;
+    font-size: 0.95rem;
+}
+
+.sin-ganadores-global {
+    background: #fff8e6;
+    border: 2px solid #ffc107;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    font-size: 1.05rem;
+}
