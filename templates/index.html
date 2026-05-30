@@ -124,6 +124,10 @@
                                 <label class="label-cantidad-ganadores">¿Cuántos cartones ganan?</label>
                                 <input type="number" class="cantidad-ganadores-patron" data-patron="cuadro"
                                     min="0" max="30" value="0">
+                                <label class="label-bola-patron" data-patron="cuadro">Bola ganadora (compartida)</label>
+                                <input type="number" class="input-bola-patron" data-patron="cuadro"
+                                    min="4" max="75" value="20">
+                                <p class="ayuda ayuda-bola-compartida">Varios cartones con cuadro ganan en la misma bolita.</p>
                                 <div class="lista-ganadores-patron" data-patron="cuadro"></div>
                                 <p class="ayuda">Marca la forma del cuadro (B-I-N-G-O). Centro libre = marcado.</p>
                                 <input type="hidden" name="patron2_celdas" id="patron2_celdas"
@@ -149,6 +153,10 @@
                                 <label class="label-cantidad-ganadores">¿Cuántos cartones ganan?</label>
                                 <input type="number" class="cantidad-ganadores-patron" data-patron="linea"
                                     min="0" max="30" value="0">
+                                <label class="label-bola-patron" data-patron="linea">Bola ganadora (compartida)</label>
+                                <input type="number" class="input-bola-patron" data-patron="linea"
+                                    min="4" max="75" value="25">
+                                <p class="ayuda ayuda-bola-compartida">Varios cartones con línea ganan en la misma bolita.</p>
                                 <div class="lista-ganadores-patron" data-patron="linea"></div>
                                 <p class="ayuda">Marca la forma de la línea. Centro libre = marcado.</p>
                                 <input type="hidden" name="patron1_celdas" id="patron1_celdas"
@@ -172,6 +180,10 @@
                                 <label class="label-cantidad-ganadores">¿Cuántos cartones ganan?</label>
                                 <input type="number" class="cantidad-ganadores-patron" data-patron="lleno"
                                     min="0" max="30" value="1">
+                                <label class="label-bola-patron" data-patron="lleno">Bola ganadora (compartida)</label>
+                                <input type="number" class="input-bola-patron" data-patron="lleno"
+                                    min="24" max="75" value="55">
+                                <p class="ayuda ayuda-bola-compartida">Varios cartones llenos ganan en la misma bolita.</p>
                                 <div class="lista-ganadores-patron" data-patron="lleno"></div>
                             </div>
                         </article>
@@ -434,10 +446,21 @@
 
         function configDirigidoPorDefecto() {
             return {
-                cuadro: { activo: false, ganadores: [] },
-                linea: { activo: false, ganadores: [] },
-                lleno: { activo: true, ganadores: [{ carton: 1, bola: 55 }] }
+                cuadro: { activo: false, bola: 20, ganadores: [] },
+                linea: { activo: false, bola: 25, ganadores: [] },
+                lleno: { activo: true, bola: 55, ganadores: [{ carton: 1, bola: 55 }] }
             };
+        }
+
+        function bolaPatronDesdeConfig(patron, config) {
+            const bloque = config[patron] || {};
+            if (bloque.bola !== undefined && bloque.bola !== null) {
+                return bloque.bola;
+            }
+            if (bloque.ganadores && bloque.ganadores.length > 0 && bloque.ganadores[0].bola !== undefined) {
+                return bloque.ganadores[0].bola;
+            }
+            return BOLAS_DEFAULT[patron];
         }
 
         function aplicarConfigDirigido(config) {
@@ -446,8 +469,13 @@
                 const bloque = config[patron] || { activo: false, ganadores: [] };
                 const check = document.querySelector('.patron-activo-check[data-patron="' + patron + '"]');
                 const cantidad = document.querySelector('.cantidad-ganadores-patron[data-patron="' + patron + '"]');
+                const inputBola = document.querySelector('.input-bola-patron[data-patron="' + patron + '"]');
                 if (check) check.checked = !!bloque.activo;
                 if (cantidad) cantidad.value = bloque.ganadores ? bloque.ganadores.length : 0;
+                if (inputBola) {
+                    inputBola.value = bolaPatronDesdeConfig(patron, config);
+                    inputBola.min = minimoBolaPatron(patron);
+                }
             });
             document.getElementById('config_dirigido_json').value = JSON.stringify(config);
             actualizarVisibilidadPatronesDirigido();
@@ -467,6 +495,7 @@
         function actualizarGanadoresPatron(patron) {
             const cantidadInput = document.querySelector('.cantidad-ganadores-patron[data-patron="' + patron + '"]');
             const contenedor = document.querySelector('.lista-ganadores-patron[data-patron="' + patron + '"]');
+            const inputBola = document.querySelector('.input-bola-patron[data-patron="' + patron + '"]');
             if (!cantidadInput || !contenedor) return;
 
             const cantidad = parseInt(cantidadInput.value, 10) || 0;
@@ -475,19 +504,23 @@
             const previos = (config[patron] && config[patron].ganadores) ? config[patron].ganadores : [];
             const minBola = minimoBolaPatron(patron);
 
+            if (inputBola) {
+                inputBola.min = minBola;
+                if (parseInt(inputBola.value, 10) < minBola) {
+                    inputBola.value = minBola;
+                }
+            }
+
             contenedor.innerHTML = '';
             for (let i = 0; i < cantidad; i++) {
                 const previo = previos[i] || {};
                 const cartonDefault = previo.carton !== undefined ? previo.carton : Math.min(i + 1, total);
-                const bolaDefault = previo.bola !== undefined ? previo.bola : Math.min(BOLAS_DEFAULT[patron] + i, 75);
 
                 const fila = document.createElement('div');
-                fila.className = 'fila-ganador-dirigido';
+                fila.className = 'fila-ganador-dirigido fila-solo-carton';
                 fila.innerHTML =
-                    '<label>Cartón</label>' +
-                    '<input type="number" class="input-carton-ganador" min="1" max="' + total + '" value="' + cartonDefault + '">' +
-                    '<label>Bola</label>' +
-                    '<input type="number" class="input-bola-ganador" min="' + minBola + '" max="75" value="' + bolaDefault + '">';
+                    '<label>Cartón ganador ' + (i + 1) + '</label>' +
+                    '<input type="number" class="input-carton-ganador" min="1" max="' + total + '" value="' + cartonDefault + '">';
                 contenedor.appendChild(fila);
             }
             serializarConfigDirigido();
@@ -497,15 +530,17 @@
             const config = {};
             ['cuadro', 'linea', 'lleno'].forEach(patron => {
                 const activo = document.querySelector('.patron-activo-check[data-patron="' + patron + '"]').checked;
+                const inputBola = document.querySelector('.input-bola-patron[data-patron="' + patron + '"]');
+                const bola = inputBola ? parseInt(inputBola.value, 10) : BOLAS_DEFAULT[patron];
                 const filas = document.querySelectorAll('.lista-ganadores-patron[data-patron="' + patron + '"] .fila-ganador-dirigido');
                 const ganadores = [];
                 filas.forEach(fila => {
                     ganadores.push({
                         carton: parseInt(fila.querySelector('.input-carton-ganador').value, 10),
-                        bola: parseInt(fila.querySelector('.input-bola-ganador').value, 10)
+                        bola: bola
                     });
                 });
-                config[patron] = { activo: activo, ganadores: ganadores };
+                config[patron] = { activo: activo, bola: bola, ganadores: ganadores };
             });
             document.getElementById('config_dirigido_json').value = JSON.stringify(config);
         }
@@ -564,7 +599,12 @@
         });
 
         document.getElementById('opciones-dirigido').addEventListener('input', (e) => {
-            if (e.target.classList.contains('input-carton-ganador') || e.target.classList.contains('input-bola-ganador')) {
+            if (e.target.classList.contains('input-carton-ganador') ||
+                e.target.classList.contains('input-bola-patron')) {
+                if (e.target.classList.contains('input-bola-patron')) {
+                    const min = minimoBolaPatron(e.target.dataset.patron);
+                    if (parseInt(e.target.value, 10) < min) e.target.value = min;
+                }
                 serializarConfigDirigido();
             }
         });

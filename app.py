@@ -536,6 +536,25 @@ def validar_secuencia_modo_dirigido(secuencia):
     return secuencia
 
 
+def validar_bolas_compartidas_por_patron(ganadores):
+    """Exige que todos los ganadores del mismo patrón usen la misma bola."""
+    etiquetas = {
+        TIPO_PATRON_CUADRO: "cuadro",
+        TIPO_PATRON_LINEA: "línea",
+        TIPO_PATRON_LLENO: "cartón lleno",
+    }
+    bolas_por_tipo = {}
+    for ganador in ganadores:
+        tipo = ganador["tipo_patron"]
+        bolas_por_tipo.setdefault(tipo, set()).add(ganador["bola"])
+    for tipo, bolas in bolas_por_tipo.items():
+        if len(bolas) > 1:
+            raise ValueError(
+                f"En {etiquetas.get(tipo, tipo)}, todos los cartones ganadores deben "
+                "compartir la misma bola de la secuencia."
+            )
+
+
 def parsear_config_dirigido(
     texto_json, total_cartones, patron1, nombre1, patron2, nombre2
 ):
@@ -592,16 +611,31 @@ def parsear_config_dirigido(
         if tipo_patron == TIPO_PATRON_LLENO:
             minimo_bolas = 24
 
+        # Bola compartida: todos los ganadores del mismo patrón deben usar la misma bolita
+        bola_bloque = bloque.get("bola")
+        bolas_vistas = set()
+
         for indice, item in enumerate(lista, start=1):
             if not isinstance(item, dict):
                 raise ValueError(f"Entrada inválida en ganador #{indice} de {etiqueta}.")
             try:
                 numero_carton = int(item.get("carton"))
-                bola = int(item.get("bola"))
             except (TypeError, ValueError):
                 raise ValueError(
-                    f"{etiqueta}, ganador #{indice}: cartón y bola deben ser números enteros."
+                    f"{etiqueta}, ganador #{indice}: el número de cartón debe ser un entero."
                 )
+
+            if bola_bloque is not None:
+                bola = int(bola_bloque)
+            else:
+                try:
+                    bola = int(item.get("bola"))
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f"{etiqueta}, ganador #{indice}: indica la bola ganadora."
+                    )
+
+            bolas_vistas.add(bola)
 
             if numero_carton < 1 or numero_carton > int(total_cartones):
                 raise ValueError(
@@ -629,6 +663,12 @@ def parsear_config_dirigido(
                     "nombre_patron": nombre_patron,
                     "celdas_patron": celdas,
                 }
+            )
+
+        if len(bolas_vistas) > 1:
+            raise ValueError(
+                f"En {etiqueta}, todos los cartones ganadores deben compartir "
+                "la misma bola de la secuencia."
             )
 
     if not hubo_activo:
@@ -736,6 +776,7 @@ def parsear_ganadores_dirigidos(
             }
         )
 
+    validar_bolas_compartidas_por_patron(ganadores)
     return ganadores
 
 

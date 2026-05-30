@@ -685,6 +685,24 @@ body {
     margin-bottom: 0;
 }
 
+.fila-solo-carton {
+    grid-template-columns: 1fr;
+}
+
+.fila-solo-carton label {
+    grid-column: span 1;
+}
+
+.input-bola-patron {
+    margin-bottom: 4px !important;
+}
+
+.ayuda-bola-compartida {
+    margin-top: -4px;
+    margin-bottom: 10px;
+    font-size: 0.75rem;
+}
+
 .verificacion-dirigida {
     border-radius: 12px;
     padding: 16px;
