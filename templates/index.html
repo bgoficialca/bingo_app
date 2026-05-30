@@ -19,17 +19,45 @@
                 {% endif %}
 
                 <form action="/" method="POST" id="form-bingo">
-                    <label for="color_carton">Color del cartón</label>
-                    <input type="color" id="color_carton" name="color_carton"
-                        value="{{ form.color_carton if form else '#fe630b' }}" oninput="updatePreview()">
+                    <fieldset class="modo-operacion">
+                        <legend>Modo de generación</legend>
+                        {% set modo = form.modo_operacion if form else 'normal' %}
+                        <div class="modo-operacion-grid">
+                        <label class="radio-linea">
+                            <input type="radio" name="modo_operacion" value="normal"
+                                {% if modo == 'normal' %}checked{% endif %}>
+                            Normal (cartones al azar)
+                        </label>
+                        <label class="radio-linea">
+                            <input type="radio" name="modo_operacion" value="detectar"
+                                {% if modo == 'detectar' %}checked{% endif %}>
+                            Detectar ganadores
+                        </label>
+                        <label class="radio-linea">
+                            <input type="radio" name="modo_operacion" value="dirigido"
+                                {% if modo == 'dirigido' %}checked{% endif %}>
+                            Modo dirigido
+                        </label>
+                        </div>
+                    </fieldset>
 
-                    <label for="color_bingo">Color de BINGO</label>
-                    <input type="color" id="color_bingo" name="color_bingo"
-                        value="{{ form.color_bingo if form else '#000000' }}" oninput="updatePreview()">
-
-                    <label for="color_enumeracion">Color de numeración</label>
-                    <input type="color" id="color_enumeracion" name="color_enumeracion"
-                        value="{{ form.color_enumeracion if form else '#000000' }}" oninput="updatePreview()">
+                    <div class="grupo-colores">
+                        <div class="campo-color">
+                            <label for="color_carton">Color del cartón</label>
+                            <input type="color" id="color_carton" name="color_carton"
+                                value="{{ form.color_carton if form else '#fe630b' }}" oninput="updatePreview()">
+                        </div>
+                        <div class="campo-color">
+                            <label for="color_bingo">Color de BINGO</label>
+                            <input type="color" id="color_bingo" name="color_bingo"
+                                value="{{ form.color_bingo if form else '#000000' }}" oninput="updatePreview()">
+                        </div>
+                        <div class="campo-color">
+                            <label for="color_enumeracion">Color de numeración</label>
+                            <input type="color" id="color_enumeracion" name="color_enumeracion"
+                                value="{{ form.color_enumeracion if form else '#000000' }}" oninput="updatePreview()">
+                        </div>
+                    </div>
 
                     <label for="version">Versión del diseño</label>
                     <select id="version" name="version">
@@ -45,26 +73,6 @@
                         <option value="3" {% if vsel == '3' %}selected{% endif %}>Imagen personalizada 3</option>
                         <option value="4" {% if vsel == '4' %}selected{% endif %}>Imagen personalizada 4</option>
                     </select>
-
-                    <fieldset class="modo-operacion">
-                        <legend>Modo de generación</legend>
-                        {% set modo = form.modo_operacion if form else 'normal' %}
-                        <label class="radio-linea">
-                            <input type="radio" name="modo_operacion" value="normal"
-                                {% if modo == 'normal' %}checked{% endif %}>
-                            Normal (cartones al azar)
-                        </label>
-                        <label class="radio-linea">
-                            <input type="radio" name="modo_operacion" value="detectar"
-                                {% if modo == 'detectar' %}checked{% endif %}>
-                            Detectar ganadores
-                        </label>
-                        <label class="radio-linea">
-                            <input type="radio" name="modo_operacion" value="dirigido"
-                                {% if modo == 'dirigido' %}checked{% endif %}>
-                            Modo dirigido (secuencia + ganadores planeados)
-                        </label>
-                    </fieldset>
 
                     <div id="bloque-total-cartones">
                         <label for="total_cartones">Cantidad de cartones</label>
@@ -87,8 +95,8 @@
 
                     <div id="opciones-ganadores" class="opciones-ganadores">
                         <h3>Detectar ganadores</h3>
-                        <p class="ayuda">Secuencia cantada (solo números, separados por coma):</p>
-                        <textarea name="secuencia_numeros" id="secuencia_numeros"
+                        <p class="ayuda">Secuencia cantada (números separados por coma):</p>
+                        <textarea name="secuencia_numeros" id="secuencia_numeros" class="textarea-secuencia"
                             placeholder="1, 2, 3, 35, 42, 71...">{{ form.secuencia_numeros if form else '' }}</textarea>
                     </div>
 
@@ -171,29 +179,37 @@
 
                     <div id="opciones-patrones" class="opciones-ganadores">
                         <h3>Patrones de ganar</h3>
-                        <p class="ayuda">Marca las formas y ponles nombre. Cartón lleno siempre activo.</p>
+                        <p class="ayuda">Marca las formas y ponles nombre. <strong>Cartón lleno</strong> siempre activo.</p>
 
-                        <div class="patron-bloque">
-                            <label for="nombre_patron1_detectar">Nombre cuadrícula 1</label>
-                            <input type="text" id="nombre_patron1_detectar" maxlength="40"
-                                placeholder="Ej: línea" value="{{ form.nombre_patron1 if form else '' }}">
-                            <p class="ayuda">Marca las casillas (B-I-N-G-O). Vacío = no cuenta.</p>
-                            <div class="patron-encabezado">
-                                <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
-                            </div>
-                            <div class="patron-grid" id="grid-patron1-detectar"></div>
+                        <div class="patrones-detectar-grid">
+                            <article class="patron-detectar-card">
+                                <h4 class="titulo-patron-detectar">Patrón 1</h4>
+                                <label for="nombre_patron2_detectar">Nombre del patrón</label>
+                                <input type="text" id="nombre_patron2_detectar" maxlength="40"
+                                    placeholder="Ej: cuadro, cruz, esquina..." value="{{ form.nombre_patron2 if form else '' }}">
+                                <p class="ayuda">Marca las casillas (B-I-N-G-O). Vacío = no cuenta.</p>
+                                <div class="patron-encabezado">
+                                    <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+                                </div>
+                                <div class="patron-grid patron-grid-tactil" id="grid-patron2-detectar"></div>
+                            </article>
+
+                            <article class="patron-detectar-card">
+                                <h4 class="titulo-patron-detectar">Patrón 2</h4>
+                                <label for="nombre_patron1_detectar">Nombre del patrón</label>
+                                <input type="text" id="nombre_patron1_detectar" maxlength="40"
+                                    placeholder="Ej: línea, diagonal..." value="{{ form.nombre_patron1 if form else '' }}">
+                                <p class="ayuda">Marca las casillas. Centro libre = marcado.</p>
+                                <div class="patron-encabezado">
+                                    <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+                                </div>
+                                <div class="patron-grid patron-grid-tactil" id="grid-patron1-detectar"></div>
+                            </article>
                         </div>
 
-                        <div class="patron-bloque">
-                            <label for="nombre_patron2_detectar">Nombre cuadrícula 2</label>
-                            <input type="text" id="nombre_patron2_detectar" maxlength="40"
-                                placeholder="Ej: cuadro" value="{{ form.nombre_patron2 if form else '' }}">
-                            <p class="ayuda">Cuadrícula 2 vacía = solo cuadrícula 1 + cartón lleno.</p>
-                            <div class="patron-encabezado">
-                                <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
-                            </div>
-                            <div class="patron-grid" id="grid-patron2-detectar"></div>
-                        </div>
+                        <p class="ayuda nota-patron-lleno">
+                            Si dejas <strong>Patrón 2</strong> vacío, solo se evalúan <strong>Patrón 1</strong> y cartón lleno.
+                        </p>
                     </div>
 
                     <button type="submit" class="btn-principal" id="btn-generar">Generar y descargar PDF</button>

@@ -995,23 +995,23 @@ def validar_configuracion_ganadores(secuencia_texto, patron1, nombre1, patron2, 
     if patron1:
         if not nombre1:
             raise ValueError(
-                "La cuadrícula 1 tiene casillas marcadas: escribe un nombre para esa forma de ganar."
+                "Patrón 2 tiene casillas marcadas: escribe un nombre para esa forma de ganar."
             )
         modos_personalizados.append({"nombre": nombre1, "celdas": patron1})
     elif nombre1:
         raise ValueError(
-            "Escribiste un nombre en la cuadrícula 1 pero no marcaste casillas."
+            "Escribiste un nombre en Patrón 2 pero no marcaste casillas."
         )
 
     if patron2:
         if not nombre2:
             raise ValueError(
-                "La cuadrícula 2 tiene casillas marcadas: escribe un nombre para esa forma de ganar."
+                "Patrón 1 tiene casillas marcadas: escribe un nombre para esa forma de ganar."
             )
         modos_personalizados.append({"nombre": nombre2, "celdas": patron2})
     elif nombre2:
         raise ValueError(
-            "Escribiste un nombre en la cuadrícula 2 pero no marcaste casillas."
+            "Escribiste un nombre en Patrón 1 pero no marcaste casillas."
         )
 
     modos = modos_personalizados + [

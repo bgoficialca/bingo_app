@@ -45,10 +45,40 @@ body {
     gap: 16px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 768px) {
+    .pagina {
+        padding: 16px 20px;
+    }
+
     .layout-principal {
-        grid-template-columns: minmax(320px, 400px) 1fr;
+        gap: 20px;
+    }
+
+    .panel-formulario {
+        padding: 24px;
+    }
+}
+
+@media (min-width: 960px) {
+    .layout-principal {
+        grid-template-columns: minmax(340px, 440px) minmax(280px, 1fr);
         align-items: start;
+        gap: 24px;
+    }
+
+    .panel-preview {
+        position: sticky;
+        top: 16px;
+    }
+}
+
+@media (min-width: 1100px) {
+    .pagina {
+        max-width: 1200px;
+    }
+
+    .layout-principal {
+        grid-template-columns: minmax(380px, 480px) 1fr;
     }
 }
 
@@ -89,6 +119,51 @@ body {
 .panel-formulario textarea {
     min-height: 72px;
     resize: vertical;
+}
+
+.textarea-secuencia {
+    min-height: 88px;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.grupo-colores {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+
+@media (min-width: 480px) {
+    .grupo-colores {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+
+    .campo-color input[type="color"] {
+        height: 44px;
+        padding: 4px;
+        cursor: pointer;
+    }
+
+    .campo-color label {
+        font-size: 0.8rem;
+    }
+}
+
+.modo-operacion-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+@media (min-width: 480px) {
+    .modo-operacion-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
 }
 
 .fila-nombre {
@@ -219,6 +294,113 @@ body {
     background: var(--ok);
     color: #fff;
     border-color: #14532d;
+}
+
+/* Detectar ganadores: tarjetas Patrón 1 y Patrón 2 */
+.patrones-detectar-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 8px;
+}
+
+@media (min-width: 640px) {
+    .patrones-detectar-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+}
+
+.patron-detectar-card {
+    background: rgba(255, 255, 255, 0.14);
+    border: 2px solid rgba(255, 255, 255, 0.22);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.patron-detectar-card label {
+    margin-top: 4px;
+}
+
+.patron-detectar-card input[type="text"] {
+    margin-bottom: 8px;
+}
+
+.titulo-patron-detectar {
+    margin: 0 0 10px;
+    font-size: 1rem;
+    font-weight: 800;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.nota-patron-lleno {
+    margin-top: 12px;
+    margin-bottom: 0;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.patron-grid-tactil .celda-patron {
+    min-height: 36px;
+    font-size: 0.65rem;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+@media (min-width: 640px) {
+    .patron-grid-tactil .celda-patron {
+        min-height: 0;
+        aspect-ratio: 1;
+    }
+}
+
+@media (max-width: 479px) {
+    .encabezado-app h1 {
+        font-size: 1.25rem;
+    }
+
+    .panel-formulario {
+        padding: 16px;
+    }
+
+    .btn-principal {
+        padding: 16px;
+        font-size: 1rem;
+    }
+
+    .fila-nombre {
+        flex-direction: column;
+    }
+
+    .fila-nombre .btn-secundario {
+        width: 100%;
+    }
+
+    .fila-ganador-dirigido {
+        grid-template-columns: 1fr;
+    }
+
+    .fila-ganador-dirigido label {
+        grid-column: span 1;
+    }
+
+    .preview-contenedor {
+        width: 100%;
+        max-width: 340px;
+    }
+
+    .carton-preview .bingo-fila {
+        font-size: 1.15rem;
+    }
+
+    .carton-preview .numero {
+        font-size: 0.85rem;
+        min-height: 30px;
+        padding: 5px 1px;
+    }
 }
 
 .panel-preview {
@@ -587,4 +769,35 @@ body {
     font-size: 0.85rem;
     color: #666;
     margin: 8px 0 0;
+}
+
+/* Resultados: móvil y escritorio */
+@media (min-width: 640px) {
+    .lista-patrones {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 14px;
+    }
+
+    .resultados-cuerpo {
+        padding: 28px;
+    }
+}
+
+@media (max-width: 479px) {
+    .resultados-cuerpo {
+        padding: 16px;
+    }
+
+    .resumen-sub {
+        font-size: 0.88rem;
+        word-break: break-word;
+    }
+
+    .btn-descargar,
+    .btn-regenerar {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+    }
 }
