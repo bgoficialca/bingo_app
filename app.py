@@ -1,4 +1,4 @@
-from flask import Flask, redirect, render_template, request, send_file, url_for
+from flask import Flask, redirect, render_template, request, send_file, url_for, jsonify
 from fpdf import FPDF
 from random import randint, sample
 import json
@@ -20,6 +20,22 @@ NOMBRE_BASE_DEFAULT = "cartones_BG"
 TODAS_LAS_CELDAS = {(fila, col) for fila in range(5) for col in range(5)}
 CENTRO_LIBRE = (2, 2)
 NOMBRE_CARTON_LLENO = "cartón lleno"
+RANGOS_COLUMNA = {
+    "B": list(range(1, 16)),
+    "I": list(range(16, 31)),
+    "N": list(range(31, 46)),
+    "G": list(range(46, 61)),
+    "O": list(range(61, 76)),
+}
+CANTIDAD_POR_COLUMNA = {"B": 5, "I": 5, "N": 4, "G": 5, "O": 5}
+TIPO_PATRON_CUADRO = "cuadro"
+TIPO_PATRON_LINEA = "linea"
+TIPO_PATRON_LLENO = "lleno"
+ORDEN_TIPOS_PATRON = {
+    TIPO_PATRON_CUADRO: 0,
+    TIPO_PATRON_LINEA: 1,
+    TIPO_PATRON_LLENO: 2,
+}
 
 
 def resolver_nombre_base(texto_usuario):
@@ -60,6 +76,40 @@ def formato_bola_cantada(numero):
 
 def ruta_estatica(nombre_archivo):
     return os.path.join(STATIC_DIR, nombre_archivo)
+
+
+def resolver_recursos_version(version):
+    """Devuelve rutas de logo y marca de agua según la versión del diseño (PDF y vista previa)."""
+    if version == "1.0":
+        return ruta_estatica("logo_v1.png"), ruta_estatica("watermark_v1.png")
+    if version == "navidad 1.0":
+        return ruta_estatica("logo_v1.png"), ruta_estatica("navidad_v1.png")
+    if version == "navidad 2.0":
+        return ruta_estatica("logo_v2.png"), ruta_estatica("navidad_v2.png")
+    if version == "halloween 1.0":
+        return ruta_estatica("logo_v1.png"), ruta_estatica("halloween_v1.png")
+    if version == "halloween 2.0":
+        return ruta_estatica("logo_v2.png"), ruta_estatica("halloween_v2.png")
+    if version == "1":
+        return ruta_estatica("logo_personalizado.png"), ruta_estatica("1.png")
+    if version == "2":
+        return ruta_estatica("logo_personalizado.png"), ruta_estatica("2.png")
+    if version == "3":
+        return ruta_estatica("logo_personalizado.png"), ruta_estatica("3.png")
+    if version == "4":
+        return ruta_estatica("logo_personalizado.png"), ruta_estatica("4.png")
+    if version == "2.0":
+        return ruta_estatica("logo_v2.png"), ruta_estatica("watermark_v2.png")
+    return ruta_estatica("logo_v2.png"), ruta_estatica("watermark_v2.png")
+
+
+def recursos_version_para_web(version):
+    """Rutas relativas de assets para la plantilla HTML."""
+    logo_path, watermark_path = resolver_recursos_version(version)
+    return {
+        "logo": "static/" + os.path.basename(logo_path),
+        "watermark": "static/" + os.path.basename(watermark_path),
+    }
 
 
 def ruta_fuente_arial():
@@ -152,6 +202,644 @@ def generar_secuencia_cartones(cantidad_paginas):
                 }
             )
     return cartones
+
+
+def generar_secuencia_cartones_total(total_cartones):
+    """Genera una lista exacta de cartones (sin rellenar la última página con extras)."""
+    total = int(total_cartones)
+    if total < 1:
+        raise ValueError("Debes generar al menos 1 cartón.")
+    return [
+        {"numero": indice + 1, "numeros": generar_numeros_bingo()}
+        for indice in range(total)
+    ]
+
+
+def columna_de_numero(numero):
+    """Devuelve la columna B-I-N-G-O a la que pertenece un número."""
+    if 1 <= numero <= 15:
+        return "B"
+    if 16 <= numero <= 30:
+        return "I"
+    if 31 <= numero <= 45:
+        return "N"
+    if 46 <= numero <= 60:
+        return "G"
+    if 61 <= numero <= 75:
+        return "O"
+    return None
+
+
+def numeros_en_carton(numeros_carton):
+    """Lista los números reales de un cartón (sin el centro LOGO)."""
+    resultado = []
+    for letra in "BINGO":
+        for valor in numeros_carton[letra]:
+            if valor != "LOGO":
+                resultado.append(valor)
+    return resultado
+
+
+def construir_estructura_carton(mapa_columnas):
+    """Arma el diccionario BINGO ordenado e inserta LOGO en la columna N."""
+    numeros = {}
+    for letra in "BINGO":
+        columna = sorted(mapa_columnas[letra])
+        if letra == "N":
+            columna.insert(2, "LOGO")
+        numeros[letra] = columna
+    return numeros
+
+
+def conteo_columnas_factible(conjunto_numeros):
+    """Verifica si un conjunto de 24 números puede distribuirse en las columnas del bingo."""
+    conteo = {letra: 0 for letra in "BINGO"}
+    for numero in conjunto_numeros:
+        letra = columna_de_numero(numero)
+        if letra is None:
+            return False
+        conteo[letra] += 1
+    return all(conteo[letra] == CANTIDAD_POR_COLUMNA[letra] for letra in "BINGO")
+
+
+def asignar_numeros_a_columnas(conjunto_numeros):
+    """
+    Distribuye exactamente 24 números en columnas válidas mediante backtracking.
+    Retorna la estructura del cartón o None si no hay forma válida.
+    """
+    numeros_ordenados = sorted(conjunto_numeros)
+    mapa = {letra: [] for letra in "BINGO"}
+
+    def backtrack(indice):
+        if indice == len(numeros_ordenados):
+            for letra in "BINGO":
+                if len(mapa[letra]) != CANTIDAD_POR_COLUMNA[letra]:
+                    return None
+            return construir_estructura_carton(mapa)
+
+        numero = numeros_ordenados[indice]
+        letra = columna_de_numero(numero)
+        if len(mapa[letra]) >= CANTIDAD_POR_COLUMNA[letra]:
+            return None
+        mapa[letra].append(numero)
+        resultado = backtrack(indice + 1)
+        if resultado is not None:
+            return resultado
+        mapa[letra].pop()
+        return None
+
+    return backtrack(0)
+
+
+def generar_carton_ganador_lleno(secuencia, bola_ganadora, intentos=800):
+    """Atajo para cartón lleno usando el generador genérico de patrones."""
+    return generar_carton_ganador_patron(
+        secuencia, bola_ganadora, TODAS_LAS_CELDAS, intentos=intentos
+    )
+
+
+def celdas_patron_sin_centro(celdas_patron):
+    """Casillas del patrón que requieren un número (excluye el centro libre)."""
+    return [celda for celda in celdas_patron if celda != CENTRO_LIBRE]
+
+
+def primera_posicion_en_prefijo(prefijo):
+    """Mapa número → índice de su primera aparición en el prefijo de la secuencia."""
+    posiciones = {}
+    for indice, numero in enumerate(prefijo):
+        if numero not in posiciones:
+            posiciones[numero] = indice
+    return posiciones
+
+
+def letra_de_celda(fila, col):
+    return "BINGO"[col]
+
+
+def numero_en_celda(numeros_carton, fila, col):
+    return numeros_carton[letra_de_celda(fila, col)][fila]
+
+
+def asignar_celdas_patron_recursivo(
+    celdas_pendientes, pool, asignacion, posiciones, posicion_maxima
+):
+    """Backtracking: asigna números del pool a celdas del patrón respetando columnas."""
+    if not celdas_pendientes:
+        return True
+
+    fila, col = celdas_pendientes[0]
+    letra = letra_de_celda(fila, col)
+    usados = set(asignacion.values())
+    candidatos = [
+        numero
+        for numero in pool
+        if numero not in usados
+        and columna_de_numero(numero) == letra
+        and posiciones[numero] <= posicion_maxima
+    ]
+
+    for numero in sample(candidatos, len(candidatos)):
+        asignacion[(fila, col)] = numero
+        if asignar_celdas_patron_recursivo(
+            celdas_pendientes[1:], pool, asignacion, posiciones, posicion_maxima
+        ):
+            return True
+        del asignacion[(fila, col)]
+    return False
+
+
+def completar_carton_desde_asignacion(asignacion_celdas):
+    """
+    Completa un cartón válido a partir de celdas ya asignadas (patrón ganador).
+    asignacion_celdas: dict (fila, col) → número
+    """
+    mapa = {letra: [] for letra in "BINGO"}
+    for (fila, col), numero in asignacion_celdas.items():
+        mapa[letra_de_celda(fila, col)].append(numero)
+
+    for letra in "BINGO":
+        faltantes = CANTIDAD_POR_COLUMNA[letra] - len(mapa[letra])
+        if faltantes < 0:
+            return None
+        if faltantes == 0:
+            continue
+        usados = set(mapa[letra])
+        disponibles = [n for n in RANGOS_COLUMNA[letra] if n not in usados]
+        if len(disponibles) < faltantes:
+            return None
+        mapa[letra].extend(sample(disponibles, faltantes))
+
+    return construir_estructura_carton(mapa)
+
+
+def ultima_bola_patron(numeros_carton, secuencia, celdas_patron, limite_bola):
+    """Última bola (≤ limite) en que se marca alguna casilla del patrón."""
+    numeros_patron = set()
+    for fila, col in celdas_patron:
+        if (fila, col) == CENTRO_LIBRE:
+            continue
+        numeros_patron.add(numero_en_celda(numeros_carton, fila, col))
+
+    ultima = 0
+    for indice, numero in enumerate(secuencia[:limite_bola], start=1):
+        if numero in numeros_patron:
+            ultima = indice
+    return ultima
+
+
+def generar_carton_ganador_patron(secuencia, bola_ganadora, celdas_patron, intentos=3000):
+    """
+    Construye un cartón que completa el patrón indicado exactamente en la bola pedida.
+    Funciona para cuadro, línea o cartón lleno.
+    """
+    celdas = celdas_patron_sin_centro(celdas_patron)
+    minimo_bolas = len(celdas)
+    if celdas_patron == TODAS_LAS_CELDAS:
+        minimo_bolas = 24
+
+    if bola_ganadora < minimo_bolas:
+        raise ValueError(
+            f"El patrón necesita al menos {minimo_bolas} bolas; indicaste la bola {bola_ganadora}."
+        )
+    if bola_ganadora > len(secuencia):
+        raise ValueError(
+            f"La bola {bola_ganadora} supera la longitud de la secuencia ({len(secuencia)})."
+        )
+
+    prefijo = secuencia[:bola_ganadora]
+    numero_cierre = secuencia[bola_ganadora - 1]
+    posiciones = primera_posicion_en_prefijo(prefijo)
+
+    if numero_cierre not in posiciones:
+        raise ValueError(
+            f"El número de cierre {numero_cierre} no aparece antes de la bola {bola_ganadora}."
+        )
+
+    posicion_cierre = posiciones[numero_cierre]
+    pool = [numero for numero, pos in posiciones.items() if pos <= posicion_cierre]
+    letra_cierre = columna_de_numero(numero_cierre)
+
+    celdas_cierre = [
+        celda
+        for celda in celdas
+        if letra_de_celda(celda[0], celda[1]) == letra_cierre
+    ]
+    if not celdas_cierre:
+        raise ValueError(
+            f"En la bola {bola_ganadora} sale el {numero_cierre} (columna {letra_cierre}), "
+            "pero ninguna casilla del patrón pertenece a esa columna."
+        )
+
+    if celdas_patron == TODAS_LAS_CELDAS:
+        for _ in range(intentos):
+            elegidos = sample([n for n in pool if n != numero_cierre], 23) + [numero_cierre]
+            if not conteo_columnas_factible(elegidos):
+                continue
+            carton = asignar_numeros_a_columnas(elegidos)
+            if carton is None:
+                continue
+            if ultima_bola_patron(carton, secuencia, celdas_patron, bola_ganadora) == bola_ganadora:
+                return carton
+        raise ValueError(
+            f"No se pudo generar cartón lleno ganador en la bola {bola_ganadora}. "
+            "Prueba otra posición o ajusta la secuencia."
+        )
+
+    for _ in range(intentos):
+        celda_cierre = sample(celdas_cierre, 1)[0]
+        otras = [c for c in celdas if c != celda_cierre]
+        asignacion = {celda_cierre: numero_cierre}
+
+        if not asignar_celdas_patron_recursivo(
+            otras, pool, asignacion, posiciones, posicion_cierre
+        ):
+            continue
+
+        carton = completar_carton_desde_asignacion(asignacion)
+        if carton is None:
+            continue
+
+        if ultima_bola_patron(carton, secuencia, celdas_patron, bola_ganadora) != bola_ganadora:
+            continue
+
+        marcadas = {CENTRO_LIBRE}
+        for indice, numero in enumerate(secuencia[:bola_ganadora], start=1):
+            marcar_numero_en_carton(marcadas, carton, numero)
+            if indice == bola_ganadora and patron_cumplido(marcadas, celdas_patron):
+                return carton
+
+    raise ValueError(
+        f"No se pudo generar ganador del patrón en la bola {bola_ganadora}. "
+        "Prueba otra posición o ajusta la secuencia."
+    )
+
+
+def generar_carton_perdedor(numeros_bloqueo, intentos=400):
+    """
+    Genera un cartón perdedor que incluye al menos un número de bloqueo
+    (números que aún no salieron cuando gana el cartón principal).
+    """
+    if not numeros_bloqueo:
+        raise ValueError(
+            "No quedan números de bloqueo en la cola de la secuencia para los cartones perdedores."
+        )
+
+    lista_bloqueo = list(numeros_bloqueo)
+    for _ in range(intentos):
+        numero_bloque = sample(lista_bloqueo, 1)[0]
+        letra_bloque = columna_de_numero(numero_bloque)
+        mapa = {letra: [] for letra in "BINGO"}
+        mapa[letra_bloque].append(numero_bloque)
+
+        valido = True
+        for letra in "BINGO":
+            faltantes = CANTIDAD_POR_COLUMNA[letra] - len(mapa[letra])
+            if faltantes < 0:
+                valido = False
+                break
+            if faltantes == 0:
+                continue
+            disponibles = [
+                n
+                for n in RANGOS_COLUMNA[letra]
+                if n not in mapa[letra] and n not in numeros_bloqueo
+            ]
+            if len(disponibles) < faltantes:
+                valido = False
+                break
+            mapa[letra].extend(sample(disponibles, faltantes))
+
+        if not valido:
+            continue
+
+        carton = construir_estructura_carton(mapa)
+        if any(n in numeros_bloqueo for n in numeros_en_carton(carton)):
+            return carton
+
+    raise ValueError(
+        "No se pudo generar un cartón perdedor con los números de bloqueo disponibles."
+    )
+
+
+def validar_secuencia_modo_dirigido(secuencia):
+    """Exige una secuencia completa de 75 números únicos entre 1 y 75."""
+    if len(secuencia) != 75:
+        raise ValueError(
+            f"El modo dirigido requiere una secuencia completa de 75 bolas; recibiste {len(secuencia)}."
+        )
+    if len(set(secuencia)) != 75:
+        raise ValueError(
+            "La secuencia debe tener 75 números distintos (sin repetidos) del 1 al 75."
+        )
+    return secuencia
+
+
+def parsear_ganadores_dirigidos(
+    texto_json, total_cartones, cantidad_ganadores, patron1, nombre1, patron2, nombre2
+):
+    """
+    Lee la configuración JSON de ganadores del modo dirigido.
+    Cada entrada: cartón, bola y patrón (cuadro | linea | lleno).
+    """
+    if not texto_json or not str(texto_json).strip():
+        raise ValueError("Debes indicar qué cartones serán ganadores.")
+    try:
+        datos = json.loads(texto_json)
+    except json.JSONDecodeError:
+        raise ValueError("La configuración de ganadores no es válida.")
+
+    if not isinstance(datos, list):
+        raise ValueError("La configuración de ganadores debe ser una lista.")
+
+    if len(datos) != int(cantidad_ganadores):
+        raise ValueError(
+            f"Indicaste {cantidad_ganadores} ganador(es), pero la configuración tiene {len(datos)}."
+        )
+
+    mapa_patrones = {
+        TIPO_PATRON_CUADRO: {"celdas": patron2, "nombre": nombre2, "etiqueta": "cuadro"},
+        TIPO_PATRON_LINEA: {"celdas": patron1, "nombre": nombre1, "etiqueta": "línea"},
+        TIPO_PATRON_LLENO: {
+            "celdas": TODAS_LAS_CELDAS,
+            "nombre": NOMBRE_CARTON_LLENO,
+            "etiqueta": "cartón lleno",
+        },
+    }
+
+    vistos = set()
+    ganadores = []
+    for indice, item in enumerate(datos, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"Entrada inválida en ganador #{indice}.")
+
+        try:
+            numero_carton = int(item.get("carton"))
+            bola = int(item.get("bola"))
+        except (TypeError, ValueError):
+            raise ValueError(f"Ganador #{indice}: cartón y bola deben ser números enteros.")
+
+        tipo_patron = str(item.get("patron", TIPO_PATRON_LLENO)).strip().lower()
+        if tipo_patron not in mapa_patrones:
+            raise ValueError(
+                f"Ganador #{indice}: patrón inválido '{tipo_patron}'. "
+                "Usa cuadro, linea o lleno."
+            )
+
+        info_patron = mapa_patrones[tipo_patron]
+        celdas = info_patron["celdas"]
+        nombre_patron = info_patron["nombre"]
+
+        if tipo_patron != TIPO_PATRON_LLENO and not celdas:
+            raise ValueError(
+                f"Ganador #{indice}: marcaste patrón '{tipo_patron}' pero la cuadrícula "
+                f"{'2 (cuadro)' if tipo_patron == TIPO_PATRON_CUADRO else '1 (línea)'} está vacía."
+            )
+        if tipo_patron != TIPO_PATRON_LLENO and not nombre_patron:
+            raise ValueError(
+                f"Ganador #{indice}: escribe el nombre del patrón "
+                f"{'cuadrícula 2' if tipo_patron == TIPO_PATRON_CUADRO else 'cuadrícula 1'}."
+            )
+
+        minimo_bolas = len(celdas_patron_sin_centro(celdas))
+        if tipo_patron == TIPO_PATRON_LLENO:
+            minimo_bolas = 24
+
+        if numero_carton < 1 or numero_carton > int(total_cartones):
+            raise ValueError(
+                f"Ganador #{indice}: el cartón {numero_carton} debe estar entre 1 y {total_cartones}."
+            )
+        if bola < minimo_bolas or bola > 75:
+            raise ValueError(
+                f"Ganador #{indice}: para {info_patron['etiqueta']} la bola debe estar "
+                f"entre {minimo_bolas} y 75."
+            )
+
+        clave = (numero_carton, tipo_patron)
+        if clave in vistos:
+            raise ValueError(
+                f"El cartón {numero_carton} está repetido con el mismo patrón '{tipo_patron}'."
+            )
+        vistos.add(clave)
+
+        ganadores.append(
+            {
+                "numero_carton": numero_carton,
+                "bola": bola,
+                "tipo_patron": tipo_patron,
+                "nombre_patron": nombre_patron,
+                "celdas_patron": celdas,
+            }
+        )
+
+    return ganadores
+
+
+def ordenar_ganadores_dirigidos(ganadores_config):
+    """
+    Orden de construcción: cuadro → línea → cartón lleno; dentro de cada tipo, por bola.
+    """
+    return sorted(
+        ganadores_config,
+        key=lambda g: (ORDEN_TIPOS_PATRON[g["tipo_patron"]], g["bola"]),
+    )
+
+
+def restricciones_perdedores_desde_ganadores(ganadores_config):
+    """Arma las reglas para que los perdedores no ganen antes de lo planeado."""
+    restricciones = []
+    for tipo in (TIPO_PATRON_CUADRO, TIPO_PATRON_LINEA, TIPO_PATRON_LLENO):
+        del_tipo = [g for g in ganadores_config if g["tipo_patron"] == tipo]
+        if not del_tipo:
+            continue
+        max_bola = max(g["bola"] for g in del_tipo)
+        celdas = del_tipo[0]["celdas_patron"]
+        restricciones.append(
+            {
+                "tipo_patron": tipo,
+                "nombre_patron": del_tipo[0]["nombre_patron"],
+                "celdas": celdas,
+                "max_bola": max_bola,
+            }
+        )
+    return restricciones
+
+
+def carton_valido_como_perdedor(numeros_carton, secuencia, restricciones):
+    """True si el cartón no completa ningún patrón antes de la bola límite."""
+    for regla in restricciones:
+        marcadas = {CENTRO_LIBRE}
+        for numero in secuencia[: regla["max_bola"]]:
+            marcar_numero_en_carton(marcadas, numeros_carton, numero)
+        if patron_cumplido(marcadas, regla["celdas"]):
+            return False
+    return True
+
+
+def generar_carton_perdedor_dirigido(secuencia, restricciones, numeros_bloqueo, intentos=1200):
+    """Cartón perdedor: bloqueo en cola y sin ganar patrones antes de tiempo."""
+    if not numeros_bloqueo:
+        raise ValueError(
+            "No quedan números de bloqueo en la cola de la secuencia para cartones perdedores."
+        )
+
+    for _ in range(intentos):
+        carton = generar_carton_perdedor(numeros_bloqueo, intentos=80)
+        if carton_valido_como_perdedor(carton, secuencia, restricciones):
+            return carton
+
+    raise ValueError(
+        "No se pudo generar cartones perdedores que respeten todos los patrones. "
+        "Prueba con menos cartones o ajusta las bolas ganadoras."
+    )
+
+
+def validar_ganadores_con_secuencia(ganadores_config, secuencia):
+    """
+    Valida que en cada bola ganadora el número cantado caiga en una columna
+    compatible con el patrón (requisito matemático para poder construir el cartón).
+    """
+    for plan in ganadores_config:
+        if plan["tipo_patron"] == TIPO_PATRON_LLENO:
+            continue
+        numero_bola = secuencia[plan["bola"] - 1]
+        letra_bola = columna_de_numero(numero_bola)
+        columnas_patron = {
+            letra_de_celda(fila, col)
+            for fila, col in plan["celdas_patron"]
+            if (fila, col) != CENTRO_LIBRE
+        }
+        if letra_bola not in columnas_patron:
+            raise ValueError(
+                f"Cartón {plan['numero_carton']} ({plan['nombre_patron']}): en la bola "
+                f"{plan['bola']} sale el {numero_bola} (columna {letra_bola}), pero ese "
+                f"patrón no tiene casillas en la columna {letra_bola}. "
+                "Elige otra bola o ajusta la secuencia."
+            )
+
+
+def generar_cartones_modo_dirigido(secuencia, ganadores_config, total_cartones, reintentos_globales=12):
+    """
+    Genera cartones en orden: primero los ganadores diseñados, luego los perdedores
+    con al menos un número de bloqueo en la cola de la secuencia.
+    Reintenta la construcción si alguna secuencia puntual no admite solución.
+    """
+    secuencia = validar_secuencia_modo_dirigido(secuencia)
+    validar_ganadores_con_secuencia(ganadores_config, secuencia)
+    total = int(total_cartones)
+    if total < len(ganadores_config):
+        raise ValueError(
+            "La cantidad de cartones debe ser mayor o igual al número de ganadores."
+        )
+
+    ultimo_error = None
+    for _ in range(reintentos_globales):
+        try:
+            return _construir_cartones_modo_dirigido(
+                secuencia, ganadores_config, total
+            )
+        except ValueError as error:
+            ultimo_error = error
+    raise ultimo_error
+
+
+def _construir_cartones_modo_dirigido(secuencia, ganadores_config, total):
+    """
+    Construye cartones en orden: cuadro → línea → lleno; luego perdedores bloqueados.
+    """
+    ganadores_ordenados = ordenar_ganadores_dirigidos(ganadores_config)
+    max_bola = max(g["bola"] for g in ganadores_config)
+    numeros_bloqueo = set(secuencia[max_bola:])
+    restricciones = restricciones_perdedores_desde_ganadores(ganadores_config)
+
+    perdedores_requeridos = total - len({g["numero_carton"] for g in ganadores_config})
+    if perdedores_requeridos > 0 and not numeros_bloqueo:
+        raise ValueError(
+            "No hay bolas restantes después del último ganador para bloquear perdedores."
+        )
+
+    cartones_por_numero = {}
+    for config in ganadores_ordenados:
+        numero = config["numero_carton"]
+        if numero in cartones_por_numero:
+            raise ValueError(
+                f"El cartón {numero} tiene varios patrones ganadores; "
+                "por ahora asigna un solo patrón por cartón."
+            )
+        cartones_por_numero[numero] = generar_carton_ganador_patron(
+            secuencia, config["bola"], config["celdas_patron"]
+        )
+
+    for numero in range(1, total + 1):
+        if numero in cartones_por_numero:
+            continue
+        cartones_por_numero[numero] = generar_carton_perdedor_dirigido(
+            secuencia, restricciones, numeros_bloqueo
+        )
+
+    return [
+        {"numero": numero, "numeros": cartones_por_numero[numero]}
+        for numero in range(1, total + 1)
+    ]
+
+
+def simular_bola_patron_en_carton(numeros_carton, secuencia, celdas_patron):
+    """
+    Simula una partida para un solo cartón y devuelve en qué bola se completa el patrón.
+    Si nunca se completa, retorna (None, None).
+    """
+    marcadas = {CENTRO_LIBRE}
+    for indice_bola, numero in enumerate(secuencia, start=1):
+        marcar_numero_en_carton(marcadas, numeros_carton, numero)
+        if patron_cumplido(marcadas, celdas_patron):
+            return indice_bola, numero
+    return None, None
+
+
+def verificar_ganadores_planeados(ganadores_config, secuencia_cartones, secuencia):
+    """
+    Verifica cartón por cartón que cada ganador planeado cierre su patrón en la bola indicada.
+    """
+    cartones_por_numero = {c["numero"]: c for c in secuencia_cartones}
+    resultados = []
+    todos_ok = True
+
+    for plan in ganadores_config:
+        carton = cartones_por_numero.get(plan["numero_carton"])
+        if carton is None:
+            todos_ok = False
+            resultados.append(
+                {
+                    "carton": plan["numero_carton"],
+                    "nombre_patron": plan["nombre_patron"],
+                    "tipo_patron": plan["tipo_patron"],
+                    "bola_esperada": plan["bola"],
+                    "ok": False,
+                    "bola_real": None,
+                    "numero_real": None,
+                }
+            )
+            continue
+
+        bola_real, numero_real = simular_bola_patron_en_carton(
+            carton["numeros"], secuencia, plan["celdas_patron"]
+        )
+        ok = bola_real == plan["bola"]
+        if not ok:
+            todos_ok = False
+
+        resultados.append(
+            {
+                "carton": plan["numero_carton"],
+                "nombre_patron": plan["nombre_patron"],
+                "tipo_patron": plan["tipo_patron"],
+                "bola_esperada": plan["bola"],
+                "ok": ok,
+                "bola_real": bola_real,
+                "numero_real": numero_real,
+            }
+        )
+
+    return {"todos_ok": todos_ok, "detalle": resultados}
 
 
 def parsear_secuencia_numeros(texto):
@@ -350,36 +1038,7 @@ def generar_pdf_personalizado(
     pdf.set_auto_page_break(auto=True, margin=10)
     pdf.add_font("ArialBlackItalic", "", ruta_fuente_arial())
 
-    if version == "1.0":
-        logo_path = ruta_estatica("logo_v1.png")
-        watermark_path = ruta_estatica("watermark_v1.png")
-    elif version == "navidad 1.0":
-        logo_path = ruta_estatica("logo_v1.png")
-        watermark_path = ruta_estatica("navidad_v1.png")
-    elif version == "navidad 2.0":
-        logo_path = ruta_estatica("logo_v2.png")
-        watermark_path = ruta_estatica("navidad_v2.png")
-    elif version == "halloween 1.0":
-        logo_path = ruta_estatica("logo_v1.png")
-        watermark_path = ruta_estatica("halloween_v1.png")
-    elif version == "halloween 2.0":
-        logo_path = ruta_estatica("logo_v2.png")
-        watermark_path = ruta_estatica("halloween_v2.png")
-    elif version == "1":
-        logo_path = ruta_estatica("logo_personalizado.png")
-        watermark_path = ruta_estatica("1.png")
-    elif version == "2":
-        logo_path = ruta_estatica("logo_personalizado.png")
-        watermark_path = ruta_estatica("2.png")
-    elif version == "3":
-        logo_path = ruta_estatica("logo_personalizado.png")
-        watermark_path = ruta_estatica("3.png")
-    elif version == "4":
-        logo_path = ruta_estatica("logo_personalizado.png")
-        watermark_path = ruta_estatica("4.png")
-    else:
-        logo_path = ruta_estatica("logo_v2.png")
-        watermark_path = ruta_estatica("watermark_v2.png")
+    logo_path, watermark_path = resolver_recursos_version(version)
 
     ancho_carton = 75
     alto_carton = 87
@@ -403,11 +1062,16 @@ def generar_pdf_personalizado(
     if secuencia_cartones is None:
         secuencia_cartones = generar_secuencia_cartones(cantidad_paginas)
 
+    total_cartones = len(secuencia_cartones)
+    paginas_necesarias = max(1, (total_cartones + 5) // 6)
+
     indice_carton = 0
-    for pagina in range(int(cantidad_paginas)):
+    for pagina in range(paginas_necesarias):
         pdf.add_page()
         pdf.image(watermark_path, 0, 0, 210, 297)
-        for i in range(6):
+        cartones_restantes = total_cartones - indice_carton
+        en_esta_pagina = min(6, cartones_restantes)
+        for i in range(en_esta_pagina):
             carton = secuencia_cartones[indice_carton]
             indice_carton += 1
             x, y = posiciones_cartones[i]
@@ -460,7 +1124,12 @@ def _form_a_dict():
         "color_enumeracion": request.form.get("color_enumeracion", "#000000"),
         "cantidad_paginas": request.form.get("cantidad_paginas", "1"),
         "version": request.form.get("version", "1.0"),
+        "modo_operacion": request.form.get("modo_operacion", "normal"),
         "secuencia_numeros": request.form.get("secuencia_numeros", ""),
+        "secuencia_dirigida": request.form.get("secuencia_dirigida", ""),
+        "cantidad_ganadores": request.form.get("cantidad_ganadores", "1"),
+        "total_cartones_dirigido": request.form.get("total_cartones_dirigido", "6"),
+        "ganadores_dirigido_json": request.form.get("ganadores_dirigido_json", ""),
         "nombre_patron1": request.form.get("nombre_patron1", ""),
         "nombre_patron2": request.form.get("nombre_patron2", ""),
         "patron1_celdas": request.form.get("patron1_celdas", ""),
@@ -479,9 +1148,94 @@ def index():
         cantidad_paginas = request.form.get("cantidad_paginas", "1")
         version = request.form.get("version", "1.0")
         detectar_ganadores_modo = request.form.get("detectar-ganadores") == "on"
+        modo_operacion = request.form.get("modo_operacion", "normal")
+        if modo_operacion == "detectar":
+            detectar_ganadores_modo = True
         nombre_base = resolver_nombre_base(request.form.get("nombre_archivo", ""))
 
         secuencia_cartones = None
+
+        if modo_operacion == "dirigido":
+            try:
+                secuencia_llamados = parsear_secuencia_numeros(
+                    request.form.get("secuencia_dirigida", "")
+                )
+                validar_secuencia_modo_dirigido(secuencia_llamados)
+
+                cantidad_ganadores = int(request.form.get("cantidad_ganadores", "1"))
+                if cantidad_ganadores < 1:
+                    raise ValueError("Debe haber al menos 1 cartón ganador.")
+
+                total_cartones = int(request.form.get("total_cartones_dirigido", "6"))
+                if total_cartones < 1:
+                    raise ValueError("Debes generar al menos 1 cartón.")
+
+                patron1 = parsear_patron_celdas(request.form.get("patron1_celdas", ""))
+                patron2 = parsear_patron_celdas(request.form.get("patron2_celdas", ""))
+                nombre1 = request.form.get("nombre_patron1", "").strip()
+                nombre2 = request.form.get("nombre_patron2", "").strip()
+
+                ganadores_config = parsear_ganadores_dirigidos(
+                    request.form.get("ganadores_dirigido_json", ""),
+                    total_cartones,
+                    cantidad_ganadores,
+                    patron1,
+                    nombre1,
+                    patron2,
+                    nombre2,
+                )
+
+                _, modos = validar_configuracion_ganadores(
+                    request.form.get("secuencia_dirigida", ""),
+                    patron1,
+                    nombre1,
+                    patron2,
+                    nombre2,
+                )
+
+                secuencia_cartones = generar_cartones_modo_dirigido(
+                    secuencia_llamados,
+                    ganadores_config,
+                    total_cartones,
+                )
+
+                ganadores = detectar_ganadores(
+                    secuencia_cartones, secuencia_llamados, modos
+                )
+                resumen = preparar_resumen_ganadores(modos, ganadores)
+
+                for plan in ganadores_config:
+                    plan["numero_cantado"] = secuencia_llamados[plan["bola"] - 1]
+
+                verificacion = verificar_ganadores_planeados(
+                    ganadores_config, secuencia_cartones, secuencia_llamados
+                )
+                resumen["verificacion_dirigida"] = verificacion
+                resumen["modo_dirigido"] = True
+
+                paginas_pdf = max(1, (total_cartones + 5) // 6)
+                pdf_path, nombre_base, total_generados = generar_pdf_personalizado(
+                    color_carton,
+                    color_bingo,
+                    color_enumeracion,
+                    paginas_pdf,
+                    version,
+                    secuencia_cartones=secuencia_cartones,
+                    nombre_base=nombre_base,
+                )
+
+                resumen["total_cartones"] = total_generados
+                resumen["secuencia_texto"] = ", ".join(str(n) for n in secuencia_llamados)
+
+                token = publicar_pdf_temporal(pdf_path, nombre_base, resumen)
+                return redirect(url_for("resultados", token=token))
+
+            except ValueError as error:
+                return render_template(
+                    "index.html",
+                    error=str(error),
+                    form=_form_a_dict(),
+                )
 
         if detectar_ganadores_modo:
             try:
@@ -537,6 +1291,12 @@ def index():
         return send_file(pdf_path, as_attachment=True, download_name=f"{nombre_base}.pdf")
 
     return render_template("index.html")
+
+
+@app.route("/api/carton-muestra")
+def carton_muestra():
+    """Devuelve un cartón de muestra para la vista previa (misma estructura que el PDF)."""
+    return jsonify({"numeros": generar_numeros_bingo(), "numero_carton": 1})
 
 
 @app.route("/resultados/<token>")

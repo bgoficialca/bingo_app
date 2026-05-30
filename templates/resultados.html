@@ -19,6 +19,31 @@
                 Secuencia analizada: {{ resumen.secuencia_texto }}
             </p>
 
+            {% if resumen.verificacion_dirigida %}
+            <section class="verificacion-dirigida {% if resumen.verificacion_dirigida.todos_ok %}ok{% else %}fallo{% endif %}">
+                <h3>Verificación del modo dirigido</h3>
+                <p class="verificacion-resumen">
+                    {% if resumen.verificacion_dirigida.todos_ok %}
+                    ✓ Todos los ganadores planeados coinciden con la simulación de la partida.
+                    {% else %}
+                    ⚠ Algunos ganadores planeados no coinciden con la simulación. Revisa la configuración.
+                    {% endif %}
+                </p>
+                <ul class="lista-verificacion">
+                    {% for item in resumen.verificacion_dirigida.detalle %}
+                    <li class="{% if item.ok %}item-ok{% else %}item-fallo{% endif %}">
+                        Cartón <strong>{{ item.carton }}</strong>:
+                        {% if item.ok %}
+                        ganó <strong>{{ item.nombre_patron }}</strong> en la bola {{ item.bola_esperada }} (verificado).
+                        {% else %}
+                        se esperaba <strong>{{ item.nombre_patron }}</strong> en la bola {{ item.bola_esperada }}{% if item.bola_real %}, pero la simulación dio bola {{ item.bola_real }}{% else %} y no ganó ese patrón{% endif %}.
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </section>
+            {% endif %}
+
             {% if resumen.hay_ganadores %}
             <div class="lista-patrones">
                 {% for patron in resumen.patrones %}

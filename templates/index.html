@@ -46,9 +46,32 @@
                         <option value="4" {% if vsel == '4' %}selected{% endif %}>Imagen personalizada 4</option>
                     </select>
 
-                    <label for="cantidad_paginas">Cantidad de páginas</label>
-                    <input type="number" id="cantidad_paginas" name="cantidad_paginas"
-                        value="{{ form.cantidad_paginas if form else '1' }}" min="1">
+                    <fieldset class="modo-operacion">
+                        <legend>Modo de generación</legend>
+                        {% set modo = form.modo_operacion if form else 'normal' %}
+                        <label class="radio-linea">
+                            <input type="radio" name="modo_operacion" value="normal"
+                                {% if modo == 'normal' %}checked{% endif %}>
+                            Normal (cartones al azar)
+                        </label>
+                        <label class="radio-linea">
+                            <input type="radio" name="modo_operacion" value="detectar"
+                                {% if modo == 'detectar' %}checked{% endif %}>
+                            Detectar ganadores
+                        </label>
+                        <label class="radio-linea">
+                            <input type="radio" name="modo_operacion" value="dirigido"
+                                {% if modo == 'dirigido' %}checked{% endif %}>
+                            Modo dirigido (secuencia + ganadores planeados)
+                        </label>
+                    </fieldset>
+
+                    <div id="bloque-normal">
+                        <label for="cantidad_paginas">Cantidad de páginas</label>
+                        <input type="number" id="cantidad_paginas" name="cantidad_paginas"
+                            value="{{ form.cantidad_paginas if form else '1' }}" min="1">
+                        <p class="ayuda">6 cartones por página.</p>
+                    </div>
 
                     <label for="nombre_archivo">Nombre del PDF (opcional)</label>
                     <div class="fila-nombre">
@@ -60,17 +83,41 @@
                     </div>
                     <p class="ayuda">Vacío = <strong>cartones_BG</strong>. El botón 🎲 agrega un número del 1 al 100.</p>
 
-                    <label class="check-linea">
-                        <input type="checkbox" name="detectar-ganadores" id="detectar-ganadores"
-                            {% if form and form.detectar_ganadores_checked %}checked{% endif %}>
-                        Detectar ganadores (sin archivo de texto)
-                    </label>
+                    <!-- Compatibilidad con el checkbox anterior (modo detectar) -->
+                    <input type="hidden" name="detectar-ganadores" id="detectar-ganadores-hidden" value="">
 
                     <div id="opciones-ganadores" class="opciones-ganadores">
-                        <h3>Configuración de ganadores</h3>
+                        <h3>Detectar ganadores</h3>
                         <p class="ayuda">Secuencia cantada (solo números, separados por coma):</p>
                         <textarea name="secuencia_numeros" id="secuencia_numeros"
                             placeholder="1, 2, 3, 35, 42, 71...">{{ form.secuencia_numeros if form else '' }}</textarea>
+                    </div>
+
+                    <div id="opciones-dirigido" class="opciones-ganadores">
+                        <h3>Modo dirigido</h3>
+                        <p class="ayuda paso-dirigido"><strong>Paso 1:</strong> Secuencia completa de 75 bolas (sin repetir):</p>
+                        <textarea name="secuencia_dirigida" id="secuencia_dirigida"
+                            placeholder="1, 5, 12, 18, ... (75 números del 1 al 75)">{{ form.secuencia_dirigida if form else '' }}</textarea>
+
+                        <label for="cantidad_ganadores">Paso 2: ¿Cuántos cartones ganadores?</label>
+                        <input type="number" id="cantidad_ganadores" name="cantidad_ganadores" min="1" max="50"
+                            value="{{ form.cantidad_ganadores if form else '1' }}">
+
+                        <label for="total_cartones_dirigido">Paso 3: ¿Cuántos cartones generar en total?</label>
+                        <input type="number" id="total_cartones_dirigido" name="total_cartones_dirigido" min="1" max="300"
+                            value="{{ form.total_cartones_dirigido if form else '6' }}">
+
+                        <p class="ayuda paso-dirigido"><strong>Paso 4:</strong> Cartón, patrón y bola ganadora (orden interno: cuadro → línea → lleno):</p>
+                        <div id="lista-ganadores-dirigido" class="lista-ganadores-dirigido"></div>
+                        <input type="hidden" name="ganadores_dirigido_json" id="ganadores_dirigido_json"
+                            value="{{ form.ganadores_dirigido_json if form else '' }}">
+                    </div>
+
+                    <div id="opciones-patrones" class="opciones-ganadores">
+                        <h3>Patrones de ganar</h3>
+                        <p class="ayuda" id="ayuda-patrones-dirigido">
+                            Cuadrícula 1 = <strong>línea</strong>; cuadrícula 2 = <strong>cuadro</strong>; cartón lleno siempre activo.
+                        </p>
 
                         <div class="patron-bloque">
                             <label for="nombre_patron1">Nombre cuadrícula 1</label>
@@ -101,33 +148,147 @@
                         <p class="ayuda"><strong>3.ª forma:</strong> cartón lleno (siempre activa). Centro libre = marcado.</p>
                     </div>
 
-                    <button type="submit" class="btn-principal" id="btn-generar">Generar cartones</button>
+                    <button type="submit" class="btn-principal" id="btn-generar">Generar y descargar PDF</button>
                 </form>
             </div>
 
             <div class="tarjeta panel-preview">
                 <h2>Vista previa</h2>
-                <div class="carton-preview" id="cartonPreview">
-                    <div class="bingo" id="bingoText">B I N G O</div>
-                    <div class="numeros">
-                        <div class="numero">12</div><div class="numero">25</div><div class="numero">35</div><div class="numero">60</div><div class="numero">74</div>
-                        <div class="numero">8</div><div class="numero">18</div><div class="numero">35</div><div class="numero">53</div><div class="numero">67</div>
-                        <div class="numero">2</div><div class="numero">29</div><div class="numero">BG</div><div class="numero">52</div><div class="numero">70</div>
-                        <div class="numero">5</div><div class="numero">20</div><div class="numero">45</div><div class="numero">56</div><div class="numero">63</div>
-                        <div class="numero">7</div><div class="numero">28</div><div class="numero">38</div><div class="numero">49</div><div class="numero">72</div>
+                <p class="ayuda-preview">Igual que en el PDF: marca de agua, logo en el centro libre y colores elegidos.</p>
+                <div class="preview-contenedor" id="previewContenedor">
+                    <img class="preview-watermark" id="previewWatermark" alt="" aria-hidden="true">
+                    <div class="carton-preview" id="cartonPreview">
+                        <div class="bingo-fila" id="bingoText">
+                            <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+                        </div>
+                        <div class="numeros" id="numerosPreview"></div>
+                        <div class="enumeracion" id="enumeracionText">Cartón 1</div>
                     </div>
-                    <div class="enumeracion" id="enumeracionText">Cartón 1</div>
                 </div>
+                <button type="button" class="btn-secundario btn-refrescar-preview" id="btn-refrescar-preview">
+                    🔄 Otro cartón de muestra
+                </button>
             </div>
         </div>
     </div>
 
     <script>
+        // Recursos visuales por versión (mismos archivos que usa el PDF)
+        const RECURSOS_VERSION = {
+            '1.0': {
+                logo: "{{ url_for('static', filename='logo_v1.png') }}",
+                watermark: "{{ url_for('static', filename='watermark_v1.png') }}"
+            },
+            '2.0': {
+                logo: "{{ url_for('static', filename='logo_v2.png') }}",
+                watermark: "{{ url_for('static', filename='watermark_v2.png') }}"
+            },
+            'halloween 1.0': {
+                logo: "{{ url_for('static', filename='logo_v1.png') }}",
+                watermark: "{{ url_for('static', filename='halloween_v1.png') }}"
+            },
+            'navidad 2.0': {
+                logo: "{{ url_for('static', filename='logo_v2.png') }}",
+                watermark: "{{ url_for('static', filename='navidad_v2.png') }}"
+            },
+            'navidad 1.0': {
+                logo: "{{ url_for('static', filename='logo_v1.png') }}",
+                watermark: "{{ url_for('static', filename='navidad_v1.png') }}"
+            },
+            '1': {
+                logo: "{{ url_for('static', filename='logo_personalizado.png') }}",
+                watermark: "{{ url_for('static', filename='1.png') }}"
+            },
+            '2': {
+                logo: "{{ url_for('static', filename='logo_personalizado.png') }}",
+                watermark: "{{ url_for('static', filename='2.png') }}"
+            },
+            '3': {
+                logo: "{{ url_for('static', filename='logo_personalizado.png') }}",
+                watermark: "{{ url_for('static', filename='3.png') }}"
+            },
+            '4': {
+                logo: "{{ url_for('static', filename='logo_personalizado.png') }}",
+                watermark: "{{ url_for('static', filename='4.png') }}"
+            }
+        };
+
+        let logoPreviewActual = RECURSOS_VERSION['1.0'].logo;
+
+        function recursosDeVersion(version) {
+            return RECURSOS_VERSION[version] || RECURSOS_VERSION['2.0'];
+        }
+
         function updatePreview() {
             const preview = document.getElementById('cartonPreview');
+            const version = document.getElementById('version').value;
+            const recursos = recursosDeVersion(version);
+            logoPreviewActual = recursos.logo;
+
             preview.style.setProperty('--carton-color', document.getElementById('color_carton').value);
             document.getElementById('bingoText').style.color = document.getElementById('color_bingo').value;
             document.getElementById('enumeracionText').style.color = document.getElementById('color_enumeracion').value;
+            document.getElementById('previewWatermark').src = recursos.watermark;
+
+            document.querySelectorAll('#numerosPreview .celda-logo img').forEach(img => {
+                img.src = recursos.logo;
+            });
+        }
+
+        function renderizarCartonPreview(numerosCarton, numeroCarton) {
+            const contenedor = document.getElementById('numerosPreview');
+            contenedor.innerHTML = '';
+            const letras = 'BINGO';
+
+            for (let fila = 0; fila < 5; fila++) {
+                for (let col = 0; col < 5; col++) {
+                    const celda = document.createElement('div');
+                    celda.className = 'numero';
+                    const valor = numerosCarton[letras[col]][fila];
+
+                    if (valor === 'LOGO') {
+                        celda.classList.add('celda-logo');
+                        const img = document.createElement('img');
+                        img.src = logoPreviewActual;
+                        img.alt = 'Centro libre';
+                        celda.appendChild(img);
+                    } else {
+                        celda.textContent = valor;
+                    }
+                    contenedor.appendChild(celda);
+                }
+            }
+
+            document.getElementById('enumeracionText').textContent = 'Cartón ' + (numeroCarton || 1);
+            updatePreview();
+        }
+
+        async function cargarCartonMuestra() {
+            try {
+                const respuesta = await fetch("{{ url_for('carton_muestra') }}");
+                const datos = await respuesta.json();
+                renderizarCartonPreview(datos.numeros, datos.numero_carton);
+            } catch (e) {
+                console.error('No se pudo cargar cartón de muestra', e);
+            }
+        }
+
+        function contarCeldasPatron(hiddenId) {
+            const texto = document.getElementById(hiddenId).value || '';
+            return texto.split(';').filter(p => p.trim()).length;
+        }
+
+        function minimoBolaPatron(patron) {
+            if (patron === 'lleno') return 24;
+            if (patron === 'cuadro') return Math.max(4, contarCeldasPatron('patron2_celdas'));
+            if (patron === 'linea') return Math.max(4, contarCeldasPatron('patron1_celdas'));
+            return 1;
+        }
+
+        function bolaDefaultPatron(patron, indice) {
+            if (patron === 'cuadro') return Math.min(20 + indice, 75);
+            if (patron === 'linea') return Math.min(25 + indice, 75);
+            return Math.min(55 + indice, 75);
         }
 
         function crearCuadriculaPatron(contenedorId, hiddenId) {
@@ -164,36 +325,138 @@
                             seleccionadas.delete(clave);
                         }
                         hidden.value = Array.from(seleccionadas).join(';');
+                        if (modoSeleccionado() === 'dirigido') {
+                            actualizarCamposGanadoresDirigido();
+                        }
                     });
                     contenedor.appendChild(celda);
                 }
             }
         }
 
-        function toggleOpcionesGanadores() {
-            const chk = document.getElementById('detectar-ganadores');
-            const panel = document.getElementById('opciones-ganadores');
+        function modoSeleccionado() {
+            const marcado = document.querySelector('input[name="modo_operacion"]:checked');
+            return marcado ? marcado.value : 'normal';
+        }
+
+        function leerGanadoresDirigidoGuardados() {
+            const hidden = document.getElementById('ganadores_dirigido_json');
+            if (!hidden.value) return [];
+            try {
+                const datos = JSON.parse(hidden.value);
+                return Array.isArray(datos) ? datos : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function actualizarCamposGanadoresDirigido() {
+            const cantidad = parseInt(document.getElementById('cantidad_ganadores').value, 10) || 1;
+            const total = parseInt(document.getElementById('total_cartones_dirigido').value, 10) || 1;
+            const contenedor = document.getElementById('lista-ganadores-dirigido');
+            const previos = leerGanadoresDirigidoGuardados();
+            contenedor.innerHTML = '';
+
+            for (let i = 0; i < cantidad; i++) {
+                const bloque = document.createElement('div');
+                bloque.className = 'fila-ganador-dirigido';
+
+                const previo = previos[i] || {};
+                const patronDefault = previo.patron || (i === 0 ? 'cuadro' : (i === 1 ? 'linea' : 'lleno'));
+                const cartonDefault = previo.carton !== undefined ? previo.carton : Math.min(i + 1, total);
+                const bolaDefault = previo.bola !== undefined ? previo.bola : bolaDefaultPatron(patronDefault, i);
+                const minBola = minimoBolaPatron(patronDefault);
+
+                bloque.innerHTML =
+                    '<label>Ganador ' + (i + 1) + '</label>' +
+                    '<select class="input-patron-ganador">' +
+                    '<option value="cuadro"' + (patronDefault === 'cuadro' ? ' selected' : '') + '>Cuadro (cuadrícula 2)</option>' +
+                    '<option value="linea"' + (patronDefault === 'linea' ? ' selected' : '') + '>Línea (cuadrícula 1)</option>' +
+                    '<option value="lleno"' + (patronDefault === 'lleno' ? ' selected' : '') + '>Cartón lleno</option>' +
+                    '</select>' +
+                    '<label>Cartón</label>' +
+                    '<input type="number" class="input-carton-ganador" min="1" max="' + total + '" value="' + cartonDefault + '">' +
+                    '<label>Bola ganadora</label>' +
+                    '<input type="number" class="input-bola-ganador" min="' + minBola + '" max="75" value="' + bolaDefault + '">';
+
+                contenedor.appendChild(bloque);
+
+                const selectPatron = bloque.querySelector('.input-patron-ganador');
+                const inputBola = bloque.querySelector('.input-bola-ganador');
+                selectPatron.addEventListener('change', () => {
+                    const min = minimoBolaPatron(selectPatron.value);
+                    inputBola.min = min;
+                    if (parseInt(inputBola.value, 10) < min) inputBola.value = min;
+                    serializarGanadoresDirigido();
+                });
+            }
+
+            serializarGanadoresDirigido();
+        }
+
+        function serializarGanadoresDirigido() {
+            const filas = document.querySelectorAll('.fila-ganador-dirigido');
+            const datos = [];
+            filas.forEach(fila => {
+                const carton = parseInt(fila.querySelector('.input-carton-ganador').value, 10);
+                const bola = parseInt(fila.querySelector('.input-bola-ganador').value, 10);
+                const patron = fila.querySelector('.input-patron-ganador').value;
+                datos.push({ carton: carton, bola: bola, patron: patron });
+            });
+            document.getElementById('ganadores_dirigido_json').value = JSON.stringify(datos);
+        }
+
+        function toggleModos() {
+            const modo = modoSeleccionado();
+            const panelDetectar = document.getElementById('opciones-ganadores');
+            const panelDirigido = document.getElementById('opciones-dirigido');
+            const panelPatrones = document.getElementById('opciones-patrones');
+            const bloqueNormal = document.getElementById('bloque-normal');
             const btn = document.getElementById('btn-generar');
-            if (chk.checked) {
-                panel.classList.add('visible');
+            const hiddenDetectar = document.getElementById('detectar-ganadores-hidden');
+
+            panelDetectar.classList.toggle('visible', modo === 'detectar');
+            panelDirigido.classList.toggle('visible', modo === 'dirigido');
+            panelPatrones.classList.toggle('visible', modo === 'detectar' || modo === 'dirigido');
+            bloqueNormal.style.display = modo === 'normal' ? 'block' : 'none';
+            hiddenDetectar.value = modo === 'detectar' ? 'on' : '';
+
+            if (modo === 'detectar') {
                 btn.textContent = 'Generar y ver ganadores';
+            } else if (modo === 'dirigido') {
+                btn.textContent = 'Generar cartones dirigidos y verificar';
+                actualizarCamposGanadoresDirigido();
             } else {
-                panel.classList.remove('visible');
                 btn.textContent = 'Generar y descargar PDF';
             }
         }
+
+        document.getElementById('version').addEventListener('change', updatePreview);
+        document.getElementById('btn-refrescar-preview').addEventListener('click', cargarCartonMuestra);
 
         document.getElementById('btn-nombre-aleatorio').addEventListener('click', () => {
             const n = Math.floor(Math.random() * 100) + 1;
             document.getElementById('nombre_archivo').value = 'cartones_BG (' + n + ')';
         });
 
-        document.getElementById('detectar-ganadores').addEventListener('change', toggleOpcionesGanadores);
+        document.querySelectorAll('input[name="modo_operacion"]').forEach(radio => {
+            radio.addEventListener('change', toggleModos);
+        });
+
+        document.getElementById('cantidad_ganadores').addEventListener('input', actualizarCamposGanadoresDirigido);
+        document.getElementById('total_cartones_dirigido').addEventListener('input', actualizarCamposGanadoresDirigido);
+        document.getElementById('lista-ganadores-dirigido').addEventListener('input', serializarGanadoresDirigido);
+
+        document.getElementById('form-bingo').addEventListener('submit', () => {
+            if (modoSeleccionado() === 'dirigido') {
+                serializarGanadoresDirigido();
+            }
+        });
 
         crearCuadriculaPatron('grid-patron1', 'patron1_celdas');
         crearCuadriculaPatron('grid-patron2', 'patron2_celdas');
-        toggleOpcionesGanadores();
-        updatePreview();
+        toggleModos();
+        cargarCartonMuestra();
     </script>
 </body>
 </html>

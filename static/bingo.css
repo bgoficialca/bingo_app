@@ -226,8 +226,47 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     min-height: 280px;
+}
+
+.ayuda-preview {
+    font-size: 0.85rem;
+    color: #666;
+    margin: -8px 0 16px;
+    text-align: center;
+}
+
+.preview-contenedor {
+    position: relative;
+    width: min(100%, 320px);
+    padding: 16px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #f8f8f8;
+    box-shadow: inset 0 0 0 1px #ddd;
+}
+
+.preview-watermark {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.btn-refrescar-preview {
+    margin-top: 14px;
+    background: var(--naranja);
+    color: #fff;
+}
+
+.btn-refrescar-preview:hover {
+    background: var(--naranja-oscuro);
+    color: #fff;
 }
 
 .panel-preview h2 {
@@ -237,39 +276,63 @@ body {
 }
 
 .carton-preview {
-    width: min(100%, 300px);
+    position: relative;
+    z-index: 1;
+    width: 100%;
     background: var(--carton-color, var(--naranja));
     border: 3px solid #111;
     border-radius: 14px;
-    padding: 10px;
+    padding: 10px 8px 12px;
     text-align: center;
 }
 
-.carton-preview .bingo {
-    font-size: 1.6rem;
-    letter-spacing: 0.35em;
-    font-weight: 800;
+.carton-preview .bingo-fila {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+    font-size: 1.35rem;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
 }
 
 .carton-preview .numeros {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 4px;
-    margin-top: 8px;
+    gap: 3px;
 }
 
 .carton-preview .numero {
     background: #fff;
     border: 1px solid #111;
-    border-radius: 6px;
-    padding: 8px 2px;
-    font-size: 1rem;
-    font-weight: 700;
+    border-radius: 4px;
+    padding: 7px 2px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    font-style: italic;
+    min-height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.carton-preview .numero.celda-logo {
+    padding: 2px;
+}
+
+.carton-preview .numero.celda-logo img {
+    width: 100%;
+    height: 28px;
+    object-fit: contain;
+    display: block;
 }
 
 .carton-preview .enumeracion {
-    margin-top: 12px;
-    font-weight: 700;
+    margin-top: 10px;
+    font-weight: 800;
+    font-style: italic;
+    font-size: 0.95rem;
 }
 
 /* Página resultados */
@@ -385,4 +448,93 @@ body {
     padding: 20px;
     text-align: center;
     font-size: 1.05rem;
+}
+
+.modo-operacion {
+    border: none;
+    margin: 0 0 12px;
+    padding: 0;
+}
+
+.modo-operacion legend {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.radio-linea {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.radio-linea input {
+    width: auto;
+    margin: 0;
+}
+
+.lista-ganadores-dirigido {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.fila-ganador-dirigido {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-items: end;
+}
+
+.fila-ganador-dirigido > label:first-child {
+    grid-column: span 2;
+    margin-bottom: 0;
+    font-size: 0.9rem;
+}
+
+.fila-ganador-dirigido select,
+.fila-ganador-dirigido input {
+    margin-bottom: 0;
+}
+
+.verificacion-dirigida {
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    border: 2px solid transparent;
+}
+
+.verificacion-dirigida.ok {
+    background: var(--ok-fondo);
+    border-color: #86c99a;
+}
+
+.verificacion-dirigida.fallo {
+    background: #fdecea;
+    border-color: #e57373;
+}
+
+.verificacion-dirigida h3 {
+    margin: 0 0 8px;
+    font-size: 1.1rem;
+}
+
+.lista-verificacion {
+    margin: 10px 0 0;
+    padding-left: 20px;
+    line-height: 1.6;
+}
+
+.lista-verificacion .item-ok {
+    color: var(--ok);
+}
+
+.lista-verificacion .item-fallo {
+    color: #b71c1c;
 }
