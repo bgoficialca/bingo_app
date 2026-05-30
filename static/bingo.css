@@ -538,3 +538,53 @@ body {
 .lista-verificacion .item-fallo {
     color: #b71c1c;
 }
+
+.bloque-patron-dirigido {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.bloque-patron-dirigido.inactivo {
+    opacity: 0.75;
+}
+
+.titulo-patron-dirigido {
+    margin: 0 0 10px;
+    font-size: 1.05rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+    padding-bottom: 6px;
+}
+
+.contenido-patron-dirigido {
+    margin-top: 10px;
+}
+
+.form-regenerar {
+    margin-top: 18px;
+}
+
+.btn-regenerar {
+    background: #fff;
+    color: var(--naranja);
+    border: 2px solid var(--naranja);
+    border-radius: 12px;
+    padding: 14px 24px;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    width: 100%;
+    max-width: 360px;
+}
+
+.btn-regenerar:hover {
+    background: #fff5f0;
+}
+
+.ayuda-regenerar {
+    font-size: 0.85rem;
+    color: #666;
+    margin: 8px 0 0;
+}

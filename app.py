@@ -143,11 +143,13 @@ def ruta_meta_token(token):
     return os.path.join(tempfile.gettempdir(), f"bingo_{token_seguro(token)}.json")
 
 
-def guardar_sesion_resultados(token, nombre_base, resumen):
+def guardar_sesion_resultados(token, nombre_base, resumen, regenerar=None):
     meta = {
         "nombre_base": nombre_base,
         "resumen": resumen,
     }
+    if regenerar:
+        meta["regenerar"] = regenerar
     with open(ruta_meta_token(token), "w", encoding="utf-8") as archivo:
         json.dump(meta, archivo, ensure_ascii=False)
 
@@ -160,11 +162,11 @@ def cargar_sesion_resultados(token):
         return json.load(archivo)
 
 
-def publicar_pdf_temporal(ruta_origen, nombre_base, resumen):
+def publicar_pdf_temporal(ruta_origen, nombre_base, resumen, regenerar=None):
     token = secrets.token_urlsafe(16)
     destino = ruta_pdf_token(token)
     shutil.copy2(ruta_origen, destino)
-    guardar_sesion_resultados(token, nombre_base, resumen)
+    guardar_sesion_resultados(token, nombre_base, resumen, regenerar=regenerar)
     return token
 
 
@@ -534,13 +536,111 @@ def validar_secuencia_modo_dirigido(secuencia):
     return secuencia
 
 
+def parsear_config_dirigido(
+    texto_json, total_cartones, patron1, nombre1, patron2, nombre2
+):
+    """
+    Lee la configuración por patrón del modo dirigido.
+    Formato: { cuadro|linea|lleno: { activo, ganadores: [{carton, bola}] } }
+    """
+    if not texto_json or not str(texto_json).strip():
+        raise ValueError("Debes configurar al menos un patrón ganador en el modo dirigido.")
+    try:
+        datos = json.loads(texto_json)
+    except json.JSONDecodeError:
+        raise ValueError("La configuración del modo dirigido no es válida.")
+
+    if not isinstance(datos, dict):
+        raise ValueError("La configuración del modo dirigido debe ser un objeto JSON.")
+
+    mapa_bloques = [
+        (TIPO_PATRON_CUADRO, patron2, nombre2, "cuadro (cuadrícula 2)"),
+        (TIPO_PATRON_LINEA, patron1, nombre1, "línea (cuadrícula 1)"),
+        (TIPO_PATRON_LLENO, TODAS_LAS_CELDAS, NOMBRE_CARTON_LLENO, "cartón lleno"),
+    ]
+
+    ganadores = []
+    vistos = set()
+    hubo_activo = False
+
+    for tipo_patron, celdas, nombre_patron, etiqueta in mapa_bloques:
+        bloque = datos.get(tipo_patron, {})
+        if not isinstance(bloque, dict):
+            raise ValueError(f"Configuración inválida para el patrón '{tipo_patron}'.")
+
+        activo = bool(bloque.get("activo"))
+        lista = bloque.get("ganadores", [])
+        if not activo:
+            continue
+
+        hubo_activo = True
+        if not isinstance(lista, list) or not lista:
+            raise ValueError(
+                f"Activaste '{etiqueta}' pero no indicaste cartones ganadores."
+            )
+
+        if tipo_patron != TIPO_PATRON_LLENO and not celdas:
+            raise ValueError(
+                f"Activaste {etiqueta}: marca las casillas en la cuadrícula correspondiente."
+            )
+        if tipo_patron != TIPO_PATRON_LLENO and not nombre_patron:
+            raise ValueError(
+                f"Activaste {etiqueta}: escribe un nombre para ese patrón."
+            )
+
+        minimo_bolas = len(celdas_patron_sin_centro(celdas))
+        if tipo_patron == TIPO_PATRON_LLENO:
+            minimo_bolas = 24
+
+        for indice, item in enumerate(lista, start=1):
+            if not isinstance(item, dict):
+                raise ValueError(f"Entrada inválida en ganador #{indice} de {etiqueta}.")
+            try:
+                numero_carton = int(item.get("carton"))
+                bola = int(item.get("bola"))
+            except (TypeError, ValueError):
+                raise ValueError(
+                    f"{etiqueta}, ganador #{indice}: cartón y bola deben ser números enteros."
+                )
+
+            if numero_carton < 1 or numero_carton > int(total_cartones):
+                raise ValueError(
+                    f"{etiqueta}, ganador #{indice}: el cartón {numero_carton} "
+                    f"debe estar entre 1 y {total_cartones}."
+                )
+            if bola < minimo_bolas or bola > 75:
+                raise ValueError(
+                    f"{etiqueta}, ganador #{indice}: la bola debe estar "
+                    f"entre {minimo_bolas} y 75."
+                )
+
+            clave = (numero_carton, tipo_patron)
+            if clave in vistos:
+                raise ValueError(
+                    f"El cartón {numero_carton} está repetido en el patrón '{tipo_patron}'."
+                )
+            vistos.add(clave)
+
+            ganadores.append(
+                {
+                    "numero_carton": numero_carton,
+                    "bola": bola,
+                    "tipo_patron": tipo_patron,
+                    "nombre_patron": nombre_patron,
+                    "celdas_patron": celdas,
+                }
+            )
+
+    if not hubo_activo:
+        raise ValueError("Activa al menos un patrón con cartones ganadores.")
+
+    return ganadores
+
+
 def parsear_ganadores_dirigidos(
     texto_json, total_cartones, cantidad_ganadores, patron1, nombre1, patron2, nombre2
 ):
-    """
-    Lee la configuración JSON de ganadores del modo dirigido.
-    Cada entrada: cartón, bola y patrón (cuadro | linea | lleno).
-    """
+    """Compatibilidad con el formato anterior (lista plana de ganadores)."""
     if not texto_json or not str(texto_json).strip():
         raise ValueError("Debes indicar qué cartones serán ganadores.")
     try:
@@ -548,8 +648,13 @@ def parsear_ganadores_dirigidos(
     except json.JSONDecodeError:
         raise ValueError("La configuración de ganadores no es válida.")
 
+    if isinstance(datos, dict):
+        return parsear_config_dirigido(
+            texto_json, total_cartones, patron1, nombre1, patron2, nombre2
+        )
+
     if not isinstance(datos, list):
-        raise ValueError("La configuración de ganadores debe ser una lista.")
+        raise ValueError("La configuración de ganadores debe ser una lista u objeto.")
 
     if len(datos) != int(cantidad_ganadores):
         raise ValueError(
@@ -1029,9 +1134,9 @@ def generar_pdf_personalizado(
     color_carton_hex,
     color_bingo_hex,
     color_enumeracion_hex,
-    cantidad_paginas,
     version,
     secuencia_cartones=None,
+    total_cartones=6,
     nombre_base=NOMBRE_BASE_DEFAULT,
 ):
     pdf = FPDF("P", "mm", "A4")
@@ -1060,7 +1165,7 @@ def generar_pdf_personalizado(
     color_enumeracion = hex_a_rgb(color_enumeracion_hex)
 
     if secuencia_cartones is None:
-        secuencia_cartones = generar_secuencia_cartones(cantidad_paginas)
+        secuencia_cartones = generar_secuencia_cartones_total(total_cartones)
 
     total_cartones = len(secuencia_cartones)
     paginas_necesarias = max(1, (total_cartones + 5) // 6)
@@ -1117,19 +1222,78 @@ def generar_pdf_personalizado(
     return pdf_output, nombre_base, len(secuencia_cartones)
 
 
+def _config_regenerar_detectar(form):
+    """Guarda los datos necesarios para regenerar cartones en modo detectar."""
+    return {
+        "modo": "detectar",
+        "color_carton": form.get("color_carton", "#fe630b"),
+        "color_bingo": form.get("color_bingo", "#000000"),
+        "color_enumeracion": form.get("color_enumeracion", "#000000"),
+        "version": form.get("version", "1.0"),
+        "total_cartones": form.get("total_cartones", "6"),
+        "secuencia_numeros": form.get("secuencia_numeros", ""),
+        "nombre_patron1": form.get("nombre_patron1", ""),
+        "nombre_patron2": form.get("nombre_patron2", ""),
+        "patron1_celdas": form.get("patron1_celdas", ""),
+        "patron2_celdas": form.get("patron2_celdas", ""),
+        "nombre_archivo": form.get("nombre_archivo", ""),
+    }
+
+
+def _ejecutar_modo_detectar(config):
+    """Genera cartones al azar y detecta ganadores con la secuencia guardada."""
+    color_carton = config["color_carton"]
+    color_bingo = config["color_bingo"]
+    color_enumeracion = config["color_enumeracion"]
+    version = config["version"]
+    total_cartones = int(config.get("total_cartones", "6"))
+    if total_cartones < 1:
+        raise ValueError("Debes generar al menos 1 cartón.")
+
+    patron1 = parsear_patron_celdas(config.get("patron1_celdas", ""))
+    patron2 = parsear_patron_celdas(config.get("patron2_celdas", ""))
+    nombre1 = config.get("nombre_patron1", "").strip()
+    nombre2 = config.get("nombre_patron2", "").strip()
+
+    secuencia_llamados, modos = validar_configuracion_ganadores(
+        config.get("secuencia_numeros", ""),
+        patron1,
+        nombre1,
+        patron2,
+        nombre2,
+    )
+
+    secuencia_cartones = generar_secuencia_cartones_total(total_cartones)
+    ganadores = detectar_ganadores(secuencia_cartones, secuencia_llamados, modos)
+    resumen = preparar_resumen_ganadores(modos, ganadores)
+
+    nombre_base = resolver_nombre_base(config.get("nombre_archivo", ""))
+    pdf_path, nombre_base, total_generados = generar_pdf_personalizado(
+        color_carton,
+        color_bingo,
+        color_enumeracion,
+        version,
+        secuencia_cartones=secuencia_cartones,
+        total_cartones=total_cartones,
+        nombre_base=nombre_base,
+    )
+
+    resumen["total_cartones"] = total_generados
+    resumen["secuencia_texto"] = ", ".join(str(n) for n in secuencia_llamados)
+    return pdf_path, nombre_base, resumen
+
+
 def _form_a_dict():
     return {
         "color_carton": request.form.get("color_carton", "#fe630b"),
         "color_bingo": request.form.get("color_bingo", "#000000"),
         "color_enumeracion": request.form.get("color_enumeracion", "#000000"),
-        "cantidad_paginas": request.form.get("cantidad_paginas", "1"),
+        "total_cartones": request.form.get("total_cartones", "6"),
         "version": request.form.get("version", "1.0"),
         "modo_operacion": request.form.get("modo_operacion", "normal"),
         "secuencia_numeros": request.form.get("secuencia_numeros", ""),
         "secuencia_dirigida": request.form.get("secuencia_dirigida", ""),
-        "cantidad_ganadores": request.form.get("cantidad_ganadores", "1"),
-        "total_cartones_dirigido": request.form.get("total_cartones_dirigido", "6"),
-        "ganadores_dirigido_json": request.form.get("ganadores_dirigido_json", ""),
+        "config_dirigido_json": request.form.get("config_dirigido_json", ""),
         "nombre_patron1": request.form.get("nombre_patron1", ""),
         "nombre_patron2": request.form.get("nombre_patron2", ""),
         "patron1_celdas": request.form.get("patron1_celdas", ""),
@@ -1145,13 +1309,20 @@ def index():
         color_carton = request.form.get("color_carton", "#fe630b")
         color_bingo = request.form.get("color_bingo", "#000000")
         color_enumeracion = request.form.get("color_enumeracion", "#000000")
-        cantidad_paginas = request.form.get("cantidad_paginas", "1")
+        total_cartones = int(request.form.get("total_cartones", "6"))
         version = request.form.get("version", "1.0")
         detectar_ganadores_modo = request.form.get("detectar-ganadores") == "on"
         modo_operacion = request.form.get("modo_operacion", "normal")
         if modo_operacion == "detectar":
             detectar_ganadores_modo = True
         nombre_base = resolver_nombre_base(request.form.get("nombre_archivo", ""))
+
+        if total_cartones < 1:
+            return render_template(
+                "index.html",
+                error="Debes generar al menos 1 cartón.",
+                form=_form_a_dict(),
+            )
 
         secuencia_cartones = None
 
@@ -1162,23 +1333,18 @@ def index():
                 )
                 validar_secuencia_modo_dirigido(secuencia_llamados)
 
-                cantidad_ganadores = int(request.form.get("cantidad_ganadores", "1"))
-                if cantidad_ganadores < 1:
-                    raise ValueError("Debe haber al menos 1 cartón ganador.")
-
-                total_cartones = int(request.form.get("total_cartones_dirigido", "6"))
-                if total_cartones < 1:
-                    raise ValueError("Debes generar al menos 1 cartón.")
-
                 patron1 = parsear_patron_celdas(request.form.get("patron1_celdas", ""))
                 patron2 = parsear_patron_celdas(request.form.get("patron2_celdas", ""))
                 nombre1 = request.form.get("nombre_patron1", "").strip()
                 nombre2 = request.form.get("nombre_patron2", "").strip()
 
-                ganadores_config = parsear_ganadores_dirigidos(
-                    request.form.get("ganadores_dirigido_json", ""),
+                config_json = request.form.get("config_dirigido_json", "")
+                if not config_json:
+                    config_json = request.form.get("ganadores_dirigido_json", "")
+
+                ganadores_config = parsear_config_dirigido(
+                    config_json,
                     total_cartones,
-                    cantidad_ganadores,
                     patron1,
                     nombre1,
                     patron2,
@@ -1213,14 +1379,13 @@ def index():
                 resumen["verificacion_dirigida"] = verificacion
                 resumen["modo_dirigido"] = True
 
-                paginas_pdf = max(1, (total_cartones + 5) // 6)
                 pdf_path, nombre_base, total_generados = generar_pdf_personalizado(
                     color_carton,
                     color_bingo,
                     color_enumeracion,
-                    paginas_pdf,
                     version,
                     secuencia_cartones=secuencia_cartones,
+                    total_cartones=total_cartones,
                     nombre_base=nombre_base,
                 )
 
@@ -1239,37 +1404,15 @@ def index():
 
         if detectar_ganadores_modo:
             try:
-                patron1 = parsear_patron_celdas(request.form.get("patron1_celdas", ""))
-                patron2 = parsear_patron_celdas(request.form.get("patron2_celdas", ""))
-                nombre1 = request.form.get("nombre_patron1", "").strip()
-                nombre2 = request.form.get("nombre_patron2", "").strip()
-
-                secuencia_llamados, modos = validar_configuracion_ganadores(
-                    request.form.get("secuencia_numeros", ""),
-                    patron1,
-                    nombre1,
-                    patron2,
-                    nombre2,
+                pdf_path, nombre_base, resumen = _ejecutar_modo_detectar(
+                    _config_regenerar_detectar(request.form)
                 )
-
-                secuencia_cartones = generar_secuencia_cartones(cantidad_paginas)
-                ganadores = detectar_ganadores(secuencia_cartones, secuencia_llamados, modos)
-                resumen = preparar_resumen_ganadores(modos, ganadores)
-
-                pdf_path, nombre_base, total_cartones = generar_pdf_personalizado(
-                    color_carton,
-                    color_bingo,
-                    color_enumeracion,
-                    cantidad_paginas,
-                    version,
-                    secuencia_cartones=secuencia_cartones,
-                    nombre_base=nombre_base,
+                token = publicar_pdf_temporal(
+                    pdf_path,
+                    nombre_base,
+                    resumen,
+                    regenerar=_config_regenerar_detectar(request.form),
                 )
-
-                resumen["total_cartones"] = total_cartones
-                resumen["secuencia_texto"] = ", ".join(str(n) for n in secuencia_llamados)
-
-                token = publicar_pdf_temporal(pdf_path, nombre_base, resumen)
                 return redirect(url_for("resultados", token=token))
 
             except ValueError as error:
@@ -1283,9 +1426,9 @@ def index():
             color_carton,
             color_bingo,
             color_enumeracion,
-            cantidad_paginas,
             version,
             secuencia_cartones=secuencia_cartones,
+            total_cartones=total_cartones,
             nombre_base=nombre_base,
         )
         return send_file(pdf_path, as_attachment=True, download_name=f"{nombre_base}.pdf")
@@ -1312,7 +1455,39 @@ def resultados(token):
         token=token_seguro(token),
         nombre_base=datos["nombre_base"],
         resumen=datos["resumen"],
+        puede_regenerar=bool(datos.get("regenerar")),
     )
+
+
+@app.route("/regenerar/<token>", methods=["POST"])
+def regenerar(token):
+    """Regenera cartones al azar en modo detectar manteniendo la misma secuencia."""
+    token = token_seguro(token)
+    datos = cargar_sesion_resultados(token)
+    if not datos or not datos.get("regenerar"):
+        return render_template(
+            "index.html",
+            error="No se puede regenerar esta sesión. Vuelve a configurar el bingo.",
+        )
+
+    config = datos["regenerar"]
+    if config.get("modo") != "detectar":
+        return render_template(
+            "index.html",
+            error="La regeneración rápida solo está disponible en modo detectar ganadores.",
+        )
+
+    try:
+        pdf_path, nombre_base, resumen = _ejecutar_modo_detectar(config)
+        nuevo_token = publicar_pdf_temporal(
+            pdf_path, nombre_base, resumen, regenerar=config
+        )
+        return redirect(url_for("resultados", token=nuevo_token))
+    except ValueError as error:
+        return render_template(
+            "index.html",
+            error=str(error),
+        )
 
 
 @app.route("/descargar/<token>")

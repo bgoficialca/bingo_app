@@ -85,6 +85,16 @@
                 <a href="{{ url_for('descargar', token=token) }}" class="btn-descargar">
                     Sí, descargar {{ nombre_base }}.pdf
                 </a>
+
+                {% if puede_regenerar %}
+                <form action="{{ url_for('regenerar', token=token) }}" method="POST" class="form-regenerar">
+                    <button type="submit" class="btn-regenerar">
+                        🔄 Regenerar cartones (misma secuencia)
+                    </button>
+                    <p class="ayuda-regenerar">Genera cartones nuevos al azar y vuelve a analizar ganadores sin reconfigurar.</p>
+                </form>
+                {% endif %}
+
                 <br>
                 <a href="{{ url_for('index') }}" class="btn-volver">← Volver y generar otra tanda</a>
             </div>
