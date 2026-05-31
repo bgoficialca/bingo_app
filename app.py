@@ -539,8 +539,8 @@ def validar_secuencia_modo_dirigido(secuencia):
 def validar_bolas_compartidas_por_patron(ganadores):
     """Exige que todos los ganadores del mismo patrón usen la misma bola."""
     etiquetas = {
-        TIPO_PATRON_CUADRO: "cuadro",
-        TIPO_PATRON_LINEA: "línea",
+        TIPO_PATRON_CUADRO: "Patrón 1",
+        TIPO_PATRON_LINEA: "Patrón 2",
         TIPO_PATRON_LLENO: "cartón lleno",
     }
     bolas_por_tipo = {}
@@ -552,6 +552,39 @@ def validar_bolas_compartidas_por_patron(ganadores):
             raise ValueError(
                 f"En {etiquetas.get(tipo, tipo)}, todos los cartones ganadores deben "
                 "compartir la misma bola de la secuencia."
+            )
+
+
+def validar_orden_bolas_patrones(ganadores):
+    """
+    Regla del modo dirigido: Patrón 1 gana antes que Patrón 2,
+    y ambos antes que cartón lleno (bolas estrictamente crecientes).
+    """
+    etiquetas = {
+        TIPO_PATRON_CUADRO: "Patrón 1",
+        TIPO_PATRON_LINEA: "Patrón 2",
+        TIPO_PATRON_LLENO: "cartón lleno",
+    }
+    bolas_por_tipo = {}
+    for ganador in ganadores:
+        bolas_por_tipo[ganador["tipo_patron"]] = ganador["bola"]
+
+    secuencia_tipos = (
+        TIPO_PATRON_CUADRO,
+        TIPO_PATRON_LINEA,
+        TIPO_PATRON_LLENO,
+    )
+    activos = [tipo for tipo in secuencia_tipos if tipo in bolas_por_tipo]
+    for indice in range(len(activos) - 1):
+        tipo_actual = activos[indice]
+        tipo_siguiente = activos[indice + 1]
+        bola_actual = bolas_por_tipo[tipo_actual]
+        bola_siguiente = bolas_por_tipo[tipo_siguiente]
+        if bola_actual >= bola_siguiente:
+            raise ValueError(
+                f"{etiquetas[tipo_actual]} debe ganar en una bola anterior a "
+                f"{etiquetas[tipo_siguiente]} (tienes {bola_actual} y {bola_siguiente}). "
+                "Usa bolas estrictamente crecientes: Patrón 1 → Patrón 2 → cartón lleno."
             )
 
 
@@ -573,8 +606,8 @@ def parsear_config_dirigido(
         raise ValueError("La configuración del modo dirigido debe ser un objeto JSON.")
 
     mapa_bloques = [
-        (TIPO_PATRON_CUADRO, patron2, nombre2, "cuadro (cuadrícula 2)"),
-        (TIPO_PATRON_LINEA, patron1, nombre1, "línea (cuadrícula 1)"),
+        (TIPO_PATRON_CUADRO, patron2, nombre2, "Patrón 1"),
+        (TIPO_PATRON_LINEA, patron1, nombre1, "Patrón 2"),
         (TIPO_PATRON_LLENO, TODAS_LAS_CELDAS, NOMBRE_CARTON_LLENO, "cartón lleno"),
     ]
 
@@ -674,6 +707,8 @@ def parsear_config_dirigido(
     if not hubo_activo:
         raise ValueError("Activa al menos un patrón con cartones ganadores.")
 
+    validar_bolas_compartidas_por_patron(ganadores)
+    validar_orden_bolas_patrones(ganadores)
     return ganadores
 
 
@@ -777,6 +812,7 @@ def parsear_ganadores_dirigidos(
         )
 
     validar_bolas_compartidas_por_patron(ganadores)
+    validar_orden_bolas_patrones(ganadores)
     return ganadores
 
 
@@ -819,6 +855,87 @@ def carton_valido_como_perdedor(numeros_carton, secuencia, restricciones):
         if patron_cumplido(marcadas, regla["celdas"]):
             return False
     return True
+
+
+def restricciones_para_carton(ganadores_config, numero_carton):
+    """
+    Patrones que este cartón no debe completar antes de tiempo.
+    Excluye todas las modalidades que el mismo cartón gana a propósito.
+    """
+    tipos_ganados = {
+        g["tipo_patron"]
+        for g in ganadores_config
+        if g["numero_carton"] == numero_carton
+    }
+    todas = restricciones_perdedores_desde_ganadores(ganadores_config)
+    return [regla for regla in todas if regla["tipo_patron"] not in tipos_ganados]
+
+
+def carton_cumple_planes_ganador(numeros_carton, secuencia, planes):
+    """Verifica que el cartón cierre cada modalidad planificada en su bola exacta."""
+    for plan in planes:
+        bola_real, _ = simular_bola_patron_en_carton(
+            numeros_carton, secuencia, plan["celdas_patron"]
+        )
+        if bola_real != plan["bola"]:
+            return False
+    return True
+
+
+def generar_carton_ganador_dirigido(secuencia, config, ganadores_config, intentos_globales=100):
+    """
+    Genera un cartón ganador de una sola modalidad sin anticipar otros patrones activos.
+    """
+    return generar_carton_ganador_multiples_planes(
+        secuencia, [config], ganadores_config, intentos_globales=intentos_globales
+    )
+
+
+def generar_carton_ganador_multiples_planes(
+    secuencia, planes, ganadores_config, intentos_globales=120
+):
+    """
+    Genera un cartón que gana todas las modalidades indicadas en sus bolas planificadas.
+    Un mismo cartón puede aparecer en Patrón 1, Patrón 2 y cartón lleno.
+    """
+    if not planes:
+        raise ValueError("No hay modalidades ganadoras para construir el cartón.")
+
+    numero_carton = planes[0]["numero_carton"]
+    restricciones = restricciones_para_carton(ganadores_config, numero_carton)
+    planes_ordenados = sorted(
+        planes,
+        key=lambda plan: (ORDEN_TIPOS_PATRON[plan["tipo_patron"]], plan["bola"]),
+    )
+    nombres = ", ".join(plan["nombre_patron"] for plan in planes_ordenados)
+    ultimo_error = None
+    intentos_por_ancla = max(30, intentos_globales // len(planes_ordenados))
+
+    # Probar cada modalidad como ancla, empezando por la más temprana (Patrón 1 → lleno)
+    for plan_ancla in planes_ordenados:
+        for _ in range(intentos_por_ancla):
+            try:
+                carton = generar_carton_ganador_patron(
+                    secuencia,
+                    plan_ancla["bola"],
+                    plan_ancla["celdas_patron"],
+                    intentos=400,
+                )
+                if not carton_valido_como_perdedor(carton, secuencia, restricciones):
+                    continue
+                if carton_cumple_planes_ganador(carton, secuencia, planes_ordenados):
+                    return carton
+            except ValueError as error:
+                ultimo_error = error
+
+    mensaje = (
+        f"No se pudo generar el cartón {numero_carton} con las modalidades "
+        f"({nombres}) respetando el orden de bolas. "
+        "Prueba otras bolas o ajusta la secuencia."
+    )
+    if ultimo_error:
+        mensaje += f" Detalle: {ultimo_error}"
+    raise ValueError(mensaje)
 
 
 def generar_carton_perdedor_dirigido(secuencia, restricciones, numeros_bloqueo, intentos=1200):
@@ -872,9 +989,11 @@ def generar_cartones_modo_dirigido(secuencia, ganadores_config, total_cartones, 
     secuencia = validar_secuencia_modo_dirigido(secuencia)
     validar_ganadores_con_secuencia(ganadores_config, secuencia)
     total = int(total_cartones)
-    if total < len(ganadores_config):
+    cartones_ganadores = {g["numero_carton"] for g in ganadores_config}
+    if total < len(cartones_ganadores):
         raise ValueError(
-            "La cantidad de cartones debe ser mayor o igual al número de ganadores."
+            "La cantidad de cartones debe ser mayor o igual al número de cartones "
+            f"ganadores ({len(cartones_ganadores)} distintos)."
         )
 
     ultimo_error = None
@@ -890,9 +1009,9 @@ def generar_cartones_modo_dirigido(secuencia, ganadores_config, total_cartones, 
 
 def _construir_cartones_modo_dirigido(secuencia, ganadores_config, total):
     """
-    Construye cartones en orden: cuadro → línea → lleno; luego perdedores bloqueados.
+    Construye cartones agrupados por número: un cartón puede ganar varias modalidades.
+    Luego completa perdedores bloqueados.
     """
-    ganadores_ordenados = ordenar_ganadores_dirigidos(ganadores_config)
     max_bola = max(g["bola"] for g in ganadores_config)
     numeros_bloqueo = set(secuencia[max_bola:])
     restricciones = restricciones_perdedores_desde_ganadores(ganadores_config)
@@ -903,16 +1022,15 @@ def _construir_cartones_modo_dirigido(secuencia, ganadores_config, total):
             "No hay bolas restantes después del último ganador para bloquear perdedores."
         )
 
-    cartones_por_numero = {}
-    for config in ganadores_ordenados:
+    planes_por_carton = {}
+    for config in ganadores_config:
         numero = config["numero_carton"]
-        if numero in cartones_por_numero:
-            raise ValueError(
-                f"El cartón {numero} tiene varios patrones ganadores; "
-                "por ahora asigna un solo patrón por cartón."
-            )
-        cartones_por_numero[numero] = generar_carton_ganador_patron(
-            secuencia, config["bola"], config["celdas_patron"]
+        planes_por_carton.setdefault(numero, []).append(config)
+
+    cartones_por_numero = {}
+    for numero, planes in planes_por_carton.items():
+        cartones_por_numero[numero] = generar_carton_ganador_multiples_planes(
+            secuencia, planes, ganadores_config
         )
 
     for numero in range(1, total + 1):

@@ -739,6 +739,14 @@ body {
     color: #b71c1c;
 }
 
+.patrones-dirigido-formas {
+    margin-bottom: 16px;
+}
+
+.patrones-dirigido-formas .patron-detectar-card input[type="text"] {
+    margin-bottom: 8px;
+}
+
 .bloque-patron-dirigido {
     background: rgba(255, 255, 255, 0.12);
     border-radius: 12px;

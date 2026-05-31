@@ -106,65 +106,78 @@
                         <textarea name="secuencia_dirigida" id="secuencia_dirigida"
                             placeholder="1, 5, 12, 18, ... (75 números del 1 al 75)">{{ form.secuencia_dirigida if form else '' }}</textarea>
 
-                        <p class="ayuda paso-dirigido"><strong>Paso 2:</strong> Configura cada patrón (orden interno: cuadro → línea → lleno):</p>
+                        <p class="ayuda paso-dirigido"><strong>Paso 2:</strong> Marca las formas de <strong>Patrón 1</strong> y <strong>Patrón 2</strong> (igual que en detectar ganadores):</p>
+                        <div class="patrones-dirigido-formas">
+                            <div class="patrones-detectar-grid">
+                                <article class="patron-detectar-card">
+                                    <h4 class="titulo-patron-detectar">Patrón 1</h4>
+                                    <label for="nombre_patron2">Nombre del patrón</label>
+                                    <input type="text" name="nombre_patron2" id="nombre_patron2" maxlength="40"
+                                        placeholder="Ej: cuadro, cruz, esquina..." value="{{ form.nombre_patron2 if form else '' }}">
+                                    <p class="ayuda">Marca las casillas (B-I-N-G-O). Centro libre = marcado.</p>
+                                    <input type="hidden" name="patron2_celdas" id="patron2_celdas"
+                                        value="{{ form.patron2_celdas if form else '' }}">
+                                    <div class="patron-encabezado">
+                                        <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+                                    </div>
+                                    <div class="patron-grid patron-grid-tactil" id="grid-patron2"></div>
+                                </article>
+
+                                <article class="patron-detectar-card">
+                                    <h4 class="titulo-patron-detectar">Patrón 2</h4>
+                                    <label for="nombre_patron1">Nombre del patrón</label>
+                                    <input type="text" name="nombre_patron1" id="nombre_patron1" maxlength="40"
+                                        placeholder="Ej: línea, diagonal..." value="{{ form.nombre_patron1 if form else '' }}">
+                                    <p class="ayuda">Marca las casillas. Vacío = no se usa en este modo.</p>
+                                    <input type="hidden" name="patron1_celdas" id="patron1_celdas"
+                                        value="{{ form.patron1_celdas if form else '' }}">
+                                    <div class="patron-encabezado">
+                                        <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+                                    </div>
+                                    <div class="patron-grid patron-grid-tactil" id="grid-patron1"></div>
+                                </article>
+                            </div>
+                        </div>
+
+                        <p class="ayuda paso-dirigido"><strong>Paso 3:</strong> Configura ganadores por patrón. <strong>Regla:</strong> Patrón 1 gana antes que Patrón 2, y ambos antes que cartón lleno (bolas crecientes). Puedes repetir el mismo número de cartón en varios bloques para que gane varias modalidades.</p>
                         <input type="hidden" name="config_dirigido_json" id="config_dirigido_json"
                             value="{{ form.config_dirigido_json if form else '' }}">
 
-                        <!-- Cuadro (cuadrícula 2) — se construye primero -->
+                        <!-- Patrón 1 (cuadro) — se construye primero -->
                         <article class="bloque-patron-dirigido" data-patron="cuadro">
-                            <h4 class="titulo-patron-dirigido">Cuadro</h4>
+                            <h4 class="titulo-patron-dirigido">Patrón 1</h4>
                             <label class="check-linea">
                                 <input type="checkbox" class="patron-activo-check" data-patron="cuadro">
-                                Activar ganadores con cuadro
+                                Activar ganadores con Patrón 1
                             </label>
                             <div class="contenido-patron-dirigido" data-patron="cuadro">
-                                <label for="nombre_patron2">Nombre del patrón</label>
-                                <input type="text" name="nombre_patron2" id="nombre_patron2" maxlength="40"
-                                    placeholder="Ej: cuadro" value="{{ form.nombre_patron2 if form else '' }}">
                                 <label class="label-cantidad-ganadores">¿Cuántos cartones ganan?</label>
                                 <input type="number" class="cantidad-ganadores-patron" data-patron="cuadro"
                                     min="0" max="30" value="0">
                                 <label class="label-bola-patron" data-patron="cuadro">Bola ganadora (compartida)</label>
                                 <input type="number" class="input-bola-patron" data-patron="cuadro"
                                     min="4" max="75" value="20">
-                                <p class="ayuda ayuda-bola-compartida">Varios cartones con cuadro ganan en la misma bolita.</p>
+                                <p class="ayuda ayuda-bola-compartida">Varios cartones con Patrón 1 ganan en la misma bolita.</p>
                                 <div class="lista-ganadores-patron" data-patron="cuadro"></div>
-                                <p class="ayuda">Marca la forma del cuadro (B-I-N-G-O). Centro libre = marcado.</p>
-                                <input type="hidden" name="patron2_celdas" id="patron2_celdas"
-                                    value="{{ form.patron2_celdas if form else '' }}">
-                                <div class="patron-encabezado">
-                                    <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
-                                </div>
-                                <div class="patron-grid" id="grid-patron2"></div>
                             </div>
                         </article>
 
-                        <!-- Línea (cuadrícula 1) -->
+                        <!-- Patrón 2 (línea) -->
                         <article class="bloque-patron-dirigido" data-patron="linea">
-                            <h4 class="titulo-patron-dirigido">Línea</h4>
+                            <h4 class="titulo-patron-dirigido">Patrón 2</h4>
                             <label class="check-linea">
                                 <input type="checkbox" class="patron-activo-check" data-patron="linea">
-                                Activar ganadores con línea
+                                Activar ganadores con Patrón 2
                             </label>
                             <div class="contenido-patron-dirigido" data-patron="linea">
-                                <label for="nombre_patron1">Nombre del patrón</label>
-                                <input type="text" name="nombre_patron1" id="nombre_patron1" maxlength="40"
-                                    placeholder="Ej: línea" value="{{ form.nombre_patron1 if form else '' }}">
                                 <label class="label-cantidad-ganadores">¿Cuántos cartones ganan?</label>
                                 <input type="number" class="cantidad-ganadores-patron" data-patron="linea"
                                     min="0" max="30" value="0">
                                 <label class="label-bola-patron" data-patron="linea">Bola ganadora (compartida)</label>
                                 <input type="number" class="input-bola-patron" data-patron="linea"
                                     min="4" max="75" value="25">
-                                <p class="ayuda ayuda-bola-compartida">Varios cartones con línea ganan en la misma bolita.</p>
+                                <p class="ayuda ayuda-bola-compartida">Varios cartones con Patrón 2 ganan en la misma bolita.</p>
                                 <div class="lista-ganadores-patron" data-patron="linea"></div>
-                                <p class="ayuda">Marca la forma de la línea. Centro libre = marcado.</p>
-                                <input type="hidden" name="patron1_celdas" id="patron1_celdas"
-                                    value="{{ form.patron1_celdas if form else '' }}">
-                                <div class="patron-encabezado">
-                                    <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
-                                </div>
-                                <div class="patron-grid" id="grid-patron1"></div>
                             </div>
                         </article>
 
@@ -338,6 +351,29 @@
             return Math.max(4, contarCeldasPatron(patron));
         }
 
+        /** Regla UI: Patrón 1 → Patrón 2 → lleno con bolas estrictamente crecientes */
+        function patronDirigidoActivo(patron) {
+            const check = document.querySelector('.patron-activo-check[data-patron="' + patron + '"]');
+            return check && check.checked;
+        }
+
+        function actualizarLimitesBolasDirigido() {
+            const orden = ['cuadro', 'linea', 'lleno'];
+            let bolaAnterior = 0;
+            orden.forEach(patron => {
+                const input = document.querySelector('.input-bola-patron[data-patron="' + patron + '"]');
+                if (!input) return;
+                let minimo = Math.max(minimoBolaPatron(patron), bolaAnterior + 1);
+                input.min = minimo;
+                if (patronDirigidoActivo(patron)) {
+                    if (parseInt(input.value, 10) < minimo) {
+                        input.value = minimo;
+                    }
+                    bolaAnterior = parseInt(input.value, 10) || minimo;
+                }
+            });
+        }
+
         function crearCuadriculaPatron(contenedorId, hiddenId) {
             const contenedor = document.getElementById(contenedorId);
             const hidden = document.getElementById(hiddenId);
@@ -480,6 +516,7 @@
             document.getElementById('config_dirigido_json').value = JSON.stringify(config);
             actualizarVisibilidadPatronesDirigido();
             ['cuadro', 'linea', 'lleno'].forEach(actualizarGanadoresPatron);
+            actualizarLimitesBolasDirigido();
         }
 
         function actualizarVisibilidadPatronesDirigido() {
@@ -524,6 +561,7 @@
                 contenedor.appendChild(fila);
             }
             serializarConfigDirigido();
+            actualizarLimitesBolasDirigido();
         }
 
         function serializarConfigDirigido() {
@@ -565,6 +603,8 @@
                 sincronizarPatronesDetectar();
             } else if (modo === 'dirigido') {
                 btn.textContent = 'Generar cartones dirigidos y verificar';
+                crearCuadriculaPatron('grid-patron1', 'patron1_celdas');
+                crearCuadriculaPatron('grid-patron2', 'patron2_celdas');
                 aplicarConfigDirigido(leerConfigDirigido() || configDirigidoPorDefecto());
             } else {
                 btn.textContent = 'Generar y descargar PDF';
@@ -584,6 +624,7 @@
         document.querySelectorAll('.patron-activo-check').forEach(check => {
             check.addEventListener('change', () => {
                 actualizarVisibilidadPatronesDirigido();
+                actualizarLimitesBolasDirigido();
                 serializarConfigDirigido();
             });
         });
@@ -602,8 +643,7 @@
             if (e.target.classList.contains('input-carton-ganador') ||
                 e.target.classList.contains('input-bola-patron')) {
                 if (e.target.classList.contains('input-bola-patron')) {
-                    const min = minimoBolaPatron(e.target.dataset.patron);
-                    if (parseInt(e.target.value, 10) < min) e.target.value = min;
+                    actualizarLimitesBolasDirigido();
                 }
                 serializarConfigDirigido();
             }
