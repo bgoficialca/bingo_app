@@ -543,7 +543,8 @@ def extender_carton_para_patron(
     intentos_patron=200,
 ):
     """
-    Añade una modalidad ganadora a un cartón ya iniciado en fases anteriores.
+    Construye o amplía un cartón para una modalidad ganadora.
+    carton_actual=None: primera fase del cartón (misma lógica que las siguientes).
     Solo congelan las casillas de patrones previos; el relleno puede reorganizarse.
     """
     planes_previos = [
@@ -551,7 +552,11 @@ def extender_carton_para_patron(
         for p in planes_carton
         if ORDEN_TIPOS_PATRON[p["tipo_patron"]] < ORDEN_TIPOS_PATRON[plan["tipo_patron"]]
     ]
-    fijas = fijas_de_planes_anteriores(carton_actual, planes_previos)
+    fijas = (
+        fijas_de_planes_anteriores(carton_actual, planes_previos)
+        if carton_actual is not None
+        else {}
+    )
     ultimo_error = None
 
     for _ in range(intentos_globales):
@@ -611,7 +616,7 @@ def construir_carton_ganador_secuencial(
 ):
     """
     Construye un cartón ganador fase por fase: Patrón 1 → Patrón 2 → lleno.
-    Cada fase fija casillas; las siguientes solo amplían sin tocar lo ya acordado.
+    Usa la misma lógica de asignación + completado en todas las fases (incluida la primera).
     """
     planes = ordenar_ganadores_dirigidos(planes_carton)
     carton = None
@@ -619,24 +624,15 @@ def construir_carton_ganador_secuencial(
 
     for plan in planes:
         acumulados.append(plan)
-        if carton is None:
-            carton = generar_carton_ganador_dirigido(
-                secuencia,
-                plan,
-                ganadores_config,
-                intentos_globales=intentos_globales,
-                intentos_patron=intentos_patron,
-            )
-        else:
-            carton = extender_carton_para_patron(
-                secuencia,
-                carton,
-                plan,
-                acumulados,
-                ganadores_config,
-                intentos_globales=intentos_globales,
-                intentos_patron=intentos_patron,
-            )
+        carton = extender_carton_para_patron(
+            secuencia,
+            carton,
+            plan,
+            acumulados,
+            ganadores_config,
+            intentos_globales=intentos_globales,
+            intentos_patron=intentos_patron,
+        )
     return carton
 
 
@@ -1138,6 +1134,88 @@ def intentar_asignacion_patron_asistente(secuencia, plan, fijas, intentos=35):
     )
 
 
+def entorno_rendimiento_reducido():
+    """Render/Vercel tienen menos CPU; menos reintentos evitan timeouts."""
+    return USAR_TEMPORAL
+
+
+def parametros_intentos_dirigido(contexto="pdf"):
+    """
+    Intentos de generación según uso.
+    asistente_patron: listado rápido (solo casillas del patrón).
+    validacion / pdf: cartón completo para el PDF.
+    """
+    reducido = entorno_rendimiento_reducido()
+    if contexto == "asistente_patron":
+        return {"globales": 6, "patron": 40, "reintentos_construccion": 1}
+    if contexto == "validacion":
+        if reducido:
+            return {"globales": 40, "patron": 100, "reintentos_construccion": 4}
+        return {"globales": 80, "patron": 300, "reintentos_construccion": 15}
+    if reducido:
+        return {"globales": 50, "patron": 150, "reintentos_construccion": 6}
+    return {"globales": 120, "patron": 500, "reintentos_construccion": 30}
+
+
+def probar_generacion_completa_carton(
+    secuencia, numero_carton, planes_carton, ganadores_config, contexto="validacion"
+):
+    """Prueba si el cartón completo es generable (no solo las casillas del patrón)."""
+    params = parametros_intentos_dirigido(contexto)
+    try:
+        construir_carton_ganador_secuencial(
+            secuencia,
+            numero_carton,
+            planes_carton,
+            ganadores_config,
+            intentos_globales=params["globales"],
+            intentos_patron=params["patron"],
+        )
+        return True
+    except ValueError:
+        return False
+
+
+def validar_config_generable_dirigido(
+    secuencia, ganadores_config, total_cartones, contexto="validacion"
+):
+    """
+    Comprueba que toda la configuración se pueda materializar en cartones reales
+    antes de generar el PDF (evita prometer en el asistente lo que luego falla).
+    """
+    params = parametros_intentos_dirigido(contexto)
+    secuencia = validar_secuencia_modo_dirigido(secuencia)
+    validar_ganadores_con_secuencia(ganadores_config, secuencia)
+
+    for numero, planes in _agrupar_planes_por_carton(ganadores_config).items():
+        if not probar_generacion_completa_carton(
+            secuencia, numero, planes, ganadores_config, contexto
+        ):
+            nombres = ", ".join(p["nombre_patron"] for p in planes)
+            raise ValueError(
+                f"El cartón {numero} no se puede generar completo con {nombres}. "
+                "Prueba otras bolas o cartones en el asistente."
+            )
+
+    ultimo_error = None
+    intentos_completos = 2 if entorno_rendimiento_reducido() else min(5, params["reintentos_construccion"])
+    for _ in range(intentos_completos):
+        try:
+            _construir_cartones_modo_dirigido(
+                secuencia,
+                ganadores_config,
+                int(total_cartones),
+                params=params,
+            )
+            return True
+        except ValueError as error:
+            ultimo_error = error
+    raise ultimo_error or ValueError(
+        "No se pudo armar todos los cartones con esta configuración. "
+        "Ajusta bolas o ganadores en el asistente."
+    )
+
+
 def probar_patron_viable_asistente(secuencia, plan, ganadores_previos, intentos=35):
     """
     Viabilidad del asistente: solo casillas del patrón en juego.
@@ -1169,37 +1247,19 @@ def probar_plan_dirigido_rapido(
     secuencia, plan, ganadores_previos, intentos=15, exploracion=False
 ):
     """
-    Prueba viabilidad de un cartón para el patrón actual.
-    exploracion=True: menos intentos (listado de bolas/cartones en el asistente).
+    Prueba viabilidad de un cartón para el patrón actual (cartón completo).
+    exploracion=True: menos intentos (listado de bolas en el asistente).
     """
     planes = planes_carton_dirigido(ganadores_previos, plan)
-    es_lleno = plan["tipo_patron"] == TIPO_PATRON_LLENO
+    params = parametros_intentos_dirigido(
+        "asistente_patron" if exploracion else "validacion"
+    )
     if exploracion:
-        if es_lleno:
-            intentos_globales = 8
-            intentos_patron = 40
-        elif len(planes) == 1:
-            intentos_globales = 5
-            intentos_patron = 35
-        else:
-            intentos_globales = 8
-            intentos_patron = 35
+        intentos_globales = params["globales"]
+        intentos_patron = params["patron"]
     else:
-        intentos_globales = max(intentos, 40 if len(planes) > 1 else intentos)
-        intentos_patron = 200
-
-    if len(planes) == 1:
-        try:
-            generar_carton_ganador_dirigido(
-                secuencia,
-                plan,
-                ganadores_previos,
-                intentos_globales=intentos_globales,
-                intentos_patron=intentos_patron,
-            )
-            return True
-        except ValueError:
-            return False
+        intentos_globales = params["globales"]
+        intentos_patron = params["patron"]
 
     try:
         construir_carton_ganador_secuencial(
@@ -1283,8 +1343,8 @@ def listar_bolas_viables_asistente(
             plan = plan_ganador_dirigido(
                 num_carton, bola, tipo_patron, celdas, nombre_patron
             )
-            if probar_patron_viable_asistente(
-                secuencia, plan, ganadores_previos
+            if probar_plan_dirigido_rapido(
+                secuencia, plan, ganadores_previos, exploracion=True
             ):
                 viable_alguno = True
                 break
@@ -1312,15 +1372,17 @@ def listar_cartones_viables_asistente(
     total_cartones,
 ):
     """
-    Cartones que pueden ganar el patrón en la bola elegida.
-    Evalúa solo las casillas del patrón; el resto del cartón sigue sin crear aquí.
+    Cartones que pueden ganar el patrón en la bola elegida y generarse completos en el PDF.
     """
     previas = ganancias_previas_por_carton(ganadores_previos)
     items = []
     for numero in cartones_candidatos_dirigido(total_cartones):
         plan = plan_ganador_dirigido(numero, bola, tipo_patron, celdas, nombre_patron)
-        if not probar_patron_viable_asistente(secuencia, plan, ganadores_previos):
+        if not probar_plan_dirigido_rapido(
+            secuencia, plan, ganadores_previos, exploracion=False
+        ):
             continue
+
         items.append(
             {
                 "numero": numero,
@@ -1641,14 +1703,14 @@ def restricciones_perdedores_desde_ganadores(ganadores_config):
 
 def carton_valido_como_perdedor(numeros_carton, secuencia, restricciones):
     """
-    True si el cartón no completa ningún patrón activo antes de la bola acordada.
-    Completarlo en o después de esa bola es válido (solo cuentan los ganadores designados).
+    True si el cartón perdedor no completa patrones activos en o antes de la bola oficial.
+    Puede completarlos después; solo cuentan los ganadores designados en esa bola.
     """
     for regla in restricciones:
         bola_real, _ = simular_bola_patron_en_carton(
             numeros_carton, secuencia, regla["celdas"]
         )
-        if bola_real is not None and bola_real < regla["min_bola_ganador"]:
+        if bola_real is not None and bola_real <= regla["min_bola_ganador"]:
             return False
     return True
 
@@ -1748,12 +1810,15 @@ def validar_ganadores_con_secuencia(ganadores_config, secuencia):
             )
 
 
-def generar_cartones_modo_dirigido(secuencia, ganadores_config, total_cartones, reintentos_globales=10):
+def generar_cartones_modo_dirigido(secuencia, ganadores_config, total_cartones, reintentos_globales=None):
     """
-    Genera cartones en orden: primero los ganadores diseñados, luego los perdedores
-    con al menos un número de bloqueo en la cola de la secuencia.
-    Reintenta la construcción si alguna secuencia puntual no admite solución.
+    Genera cartones: ganadores por fases y perdedores al final.
+    Reintenta la construcción completa si algún cartón no encaja.
     """
+    params = parametros_intentos_dirigido("pdf")
+    if reintentos_globales is None:
+        reintentos_globales = params["reintentos_construccion"]
+
     secuencia = validar_secuencia_modo_dirigido(secuencia)
     validar_ganadores_con_secuencia(ganadores_config, secuencia)
     total = int(total_cartones)
@@ -1768,7 +1833,7 @@ def generar_cartones_modo_dirigido(secuencia, ganadores_config, total_cartones, 
     for _ in range(reintentos_globales):
         try:
             return _construir_cartones_modo_dirigido(
-                secuencia, ganadores_config, total
+                secuencia, ganadores_config, total, params=params
             )
         except ValueError as error:
             ultimo_error = error
@@ -1783,47 +1848,32 @@ def _agrupar_planes_por_carton(ganadores_config):
     return grupos
 
 
-def _construir_cartones_modo_dirigido(secuencia, ganadores_config, total):
+def _construir_cartones_modo_dirigido(secuencia, ganadores_config, total, params=None):
     """
-    Pipeline por fases: fija ganadores P1 → P2 → lleno (ampliando el mismo cartón si aplica),
-    luego rellena perdedores al azar sin ganar patrones antes de lo acordado.
+    Pipeline por fases: un cartón ganador por número (todas sus modalidades),
+    luego perdedores al azar sin ganar patrones antes de lo acordado.
     """
+    if params is None:
+        params = parametros_intentos_dirigido("pdf")
+
     restricciones = restricciones_perdedores_desde_ganadores(ganadores_config)
     cartones_por_numero = {}
-    procesados = set()
 
-    for tipo in (TIPO_PATRON_CUADRO, TIPO_PATRON_LINEA, TIPO_PATRON_LLENO):
-        for config in ordenar_ganadores_dirigidos(
-            [g for g in ganadores_config if g["tipo_patron"] == tipo]
-        ):
-            clave = (config["numero_carton"], config["tipo_patron"])
-            if clave in procesados:
-                continue
-            procesados.add(clave)
-
-            numero = config["numero_carton"]
-            planes_carton = [
-                g for g in ganadores_config if g["numero_carton"] == numero
-            ]
-
-            if numero not in cartones_por_numero:
-                cartones_por_numero[numero] = generar_carton_ganador_dirigido(
-                    secuencia, config, ganadores_config
-                )
-            else:
-                cartones_por_numero[numero] = extender_carton_para_patron(
-                    secuencia,
-                    cartones_por_numero[numero],
-                    config,
-                    [p for p in planes_carton if ORDEN_TIPOS_PATRON[p["tipo_patron"]] <= ORDEN_TIPOS_PATRON[config["tipo_patron"]]],
-                    ganadores_config,
-                )
+    for numero, planes in _agrupar_planes_por_carton(ganadores_config).items():
+        cartones_por_numero[numero] = construir_carton_ganador_secuencial(
+            secuencia,
+            numero,
+            planes,
+            ganadores_config,
+            intentos_globales=params["globales"],
+            intentos_patron=params["patron"],
+        )
 
     for numero in range(1, total + 1):
         if numero in cartones_por_numero:
             continue
         cartones_por_numero[numero] = generar_carton_perdedor_dirigido(
-            secuencia, restricciones
+            secuencia, restricciones, intentos=800
         )
 
     return [
@@ -2031,6 +2081,51 @@ def detectar_ganadores(secuencia_cartones, secuencia_llamados, modos):
                 }
             )
     return ganadores
+
+
+def preparar_resumen_ganadores_dirigido(ganadores_config, modos):
+    """
+    Modo dirigido: muestra únicamente los ganadores elegidos en el asistente.
+    No incluye cartones perdedores que completaron un patrón en la misma bola.
+    """
+    agrupado = {}
+    for plan in ganadores_config:
+        nombre = plan["nombre_patron"]
+        if nombre not in agrupado:
+            agrupado[nombre] = {
+                "bola": plan["bola"],
+                "numero_cantado": plan.get("numero_cantado"),
+                "cartones": [],
+            }
+        agrupado[nombre]["cartones"].append(plan["numero_carton"])
+
+    patrones = []
+    for modo in modos:
+        nombre = modo["nombre"]
+        if nombre in agrupado:
+            info = agrupado[nombre]
+            cartones = sorted(set(info["cartones"]))
+            numero_cantado = info.get("numero_cantado")
+            patrones.append(
+                {
+                    "nombre": nombre,
+                    "tiene_ganador": True,
+                    "bola_etiqueta": formato_bola_cantada(numero_cantado)
+                    if numero_cantado is not None
+                    else f"Bola {info['bola']}",
+                    "bola_posicion": info["bola"],
+                    "cartones": cartones,
+                    "un_carton": len(cartones) == 1,
+                }
+            )
+        else:
+            patrones.append({"nombre": nombre, "tiene_ganador": False})
+
+    return {
+        "patrones": patrones,
+        "hay_ganadores": any(p["tiene_ganador"] for p in patrones),
+        "solo_designados": True,
+    }
 
 
 def preparar_resumen_ganadores(modos, ganadores):
@@ -2310,16 +2405,15 @@ def index():
                     total_cartones,
                 )
 
-                ganadores = detectar_ganadores(
-                    secuencia_cartones, secuencia_llamados, modos
-                )
-                resumen = preparar_resumen_ganadores(modos, ganadores)
-
                 for plan in ganadores_config:
                     plan["numero_cantado"] = secuencia_llamados[plan["bola"] - 1]
 
                 verificacion = verificar_ganadores_planeados(
                     ganadores_config, secuencia_cartones, secuencia_llamados
+                )
+
+                resumen = preparar_resumen_ganadores_dirigido(
+                    ganadores_config, modos
                 )
                 resumen["verificacion_dirigida"] = verificacion
                 resumen["modo_dirigido"] = True
@@ -2344,6 +2438,16 @@ def index():
                 return render_template(
                     "index.html",
                     error=str(error),
+                    form=_form_a_dict(),
+                )
+            except Exception as error:
+                return render_template(
+                    "index.html",
+                    error=(
+                        "Error al generar en el servidor. Si usas Render, espera 1–2 min "
+                        "o prueba con menos cartones. Detalle: "
+                        + str(error)
+                    ),
                     form=_form_a_dict(),
                 )
 
@@ -2506,6 +2610,49 @@ def api_dirigido_pasos():
         )
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
+
+
+@app.route("/api/dirigido/validar-generacion", methods=["POST"])
+def api_dirigido_validar_generacion():
+    """Comprueba que la configuración del asistente generará el PDF sin errores."""
+    datos = request.get_json(silent=True) or {}
+    try:
+        secuencia, _ = validar_setup_asistente_dirigido(
+            datos.get("secuencia", ""),
+            bool(datos.get("activo_cuadro")),
+            bool(datos.get("activo_linea")),
+            bool(datos.get("activo_lleno")),
+            parsear_patron_celdas(datos.get("patron1_celdas", "")),
+            parsear_patron_celdas(datos.get("patron2_celdas", "")),
+            str(datos.get("nombre_patron1", "")).strip(),
+            str(datos.get("nombre_patron2", "")).strip(),
+        )
+        total_cartones = int(datos.get("total_cartones", 6))
+        config = seleccion_asistente_a_config(
+            datos.get("seleccion") or {},
+            bool(datos.get("activo_cuadro")),
+            bool(datos.get("activo_linea")),
+            bool(datos.get("activo_lleno")),
+        )
+        ganadores_config = parsear_config_dirigido(
+            json.dumps(config),
+            total_cartones,
+            parsear_patron_celdas(datos.get("patron1_celdas", "")),
+            str(datos.get("nombre_patron1", "")).strip(),
+            parsear_patron_celdas(datos.get("patron2_celdas", "")),
+            str(datos.get("nombre_patron2", "")).strip(),
+        )
+        validar_config_generable_dirigido(
+            secuencia, ganadores_config, total_cartones, contexto="validacion"
+        )
+        return jsonify(
+            {
+                "ok": True,
+                "mensaje": "Configuración verificada. Ya puedes generar el PDF.",
+            }
+        )
+    except ValueError as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
 
 
 @app.route("/api/carton-muestra")

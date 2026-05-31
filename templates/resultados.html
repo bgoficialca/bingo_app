@@ -13,11 +13,16 @@
         </header>
 
         <div class="tarjeta resultados-cuerpo">
-            <h2 class="resumen-titulo">Ganadores encontrados</h2>
+            <h2 class="resumen-titulo">
+                {% if resumen.modo_dirigido %}Ganadores del modo dirigido{% else %}Ganadores encontrados{% endif %}
+            </h2>
             <p class="resumen-sub">
                 Se generaron <strong>{{ resumen.total_cartones }}</strong> cartones.
                 Secuencia analizada: {{ resumen.secuencia_texto }}
             </p>
+            {% if resumen.solo_designados %}
+            <p class="ayuda resumen-sub">Solo se listan los cartones que elegiste en el asistente.</p>
+            {% endif %}
 
             {% if resumen.verificacion_dirigida %}
             <section class="verificacion-dirigida {% if resumen.verificacion_dirigida.todos_ok %}ok{% else %}fallo{% endif %}">

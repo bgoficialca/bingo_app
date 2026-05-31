@@ -105,7 +105,7 @@
 
                         <section class="reglas-dirigido" aria-label="Cómo funciona el asistente">
                             <h4>Asistente guiado</h4>
-                            <p class="ayuda">El sistema calcula qué bolas y cartones son posibles en cada paso. Tú eliges solo de listas válidas. Orden: Patrón 1 → Patrón 2 → cartón lleno (según lo que actives).</p>
+                            <p class="ayuda">El asistente solo muestra bolas y cartones que <strong>sí se pueden generar en el PDF</strong>. Al terminar verifica toda la configuración antes de permitir generar.</p>
                         </section>
 
                         <p class="ayuda paso-dirigido"><strong>Configuración inicial</strong> — secuencia, formas y qué patrones usar:</p>
@@ -400,8 +400,8 @@
             document.getElementById('wizard-titulo-paso').textContent = paso.nombre;
             document.getElementById('wizard-ayuda-paso').textContent =
                 asistenteDirigido.indice === 0
-                    ? 'Elige bola y cartón(es). Aquí solo se reservan las casillas del patrón; el cartón completo se arma al generar el PDF.'
-                    : 'Cualquier cartón puede salir si sus casillas del patrón encajan. Repetir uno anterior es opcional.';
+                    ? 'Elige bola y cartón(es). Solo aparecen opciones que se pueden generar en el PDF.'
+                    : 'Puedes repetir un cartón de un paso anterior. Solo se listan cartones viables.';
 
             const previo = asistenteDirigido.seleccion[paso.clave];
             if (previo && previo.bola) {
@@ -574,6 +574,8 @@
             const paso = asistenteDirigido.pasos[asistenteDirigido.indice];
             const bola = parseInt(document.getElementById('wizard-select-bola').value, 10);
             const cartones = cartonesSeleccionadosWizard();
+            const btnSig = document.getElementById('wizard-siguiente');
+            const msg = document.getElementById('wizard-mensaje');
             if (!bola) {
                 alert('Elige una bola de la lista.');
                 return;
@@ -585,11 +587,31 @@
             asistenteDirigido.seleccion[paso.clave] = { bola: bola, cartones: cartones };
 
             if (asistenteDirigido.indice >= asistenteDirigido.pasos.length - 1) {
-                asistenteDirigido.listo = true;
                 serializarConfigDesdeAsistente();
-                document.getElementById('wizard-mensaje').textContent =
-                    'Asistente completado. Pulsa el botón de abajo para generar el PDF y verificar.';
-                document.getElementById('wizard-siguiente').disabled = true;
+                btnSig.disabled = true;
+                btnSig.textContent = 'Verificando…';
+                msg.textContent = 'Comprobando que toda la configuración genere el PDF…';
+
+                const resp = await fetch("{{ url_for('api_dirigido_validar_generacion') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadBaseDirigido())
+                });
+                const data = await resp.json();
+
+                if (!resp.ok || !data.ok) {
+                    msg.textContent = data.error || 'Esta combinación no se puede generar. Prueba otras bolas o cartones.';
+                    btnSig.disabled = false;
+                    btnSig.textContent = 'Reintentar paso';
+                    asistenteDirigido.listo = false;
+                    actualizarBotonGenerarDirigido();
+                    return;
+                }
+
+                asistenteDirigido.listo = true;
+                msg.textContent = data.mensaje || 'Listo. Pulsa el botón de abajo para generar el PDF.';
+                btnSig.disabled = true;
+                btnSig.textContent = 'Completado';
                 renderProgresoWizard();
                 actualizarBotonGenerarDirigido();
                 return;
@@ -852,6 +874,9 @@
                     return;
                 }
                 serializarConfigDesdeAsistente();
+                const btn = document.getElementById('btn-generar');
+                btn.disabled = true;
+                btn.textContent = 'Generando cartones… (en el servidor puede tardar 2–3 min)';
             } else if (modoSeleccionado() === 'detectar') {
                 sincronizarPatronesDetectar();
                 document.getElementById('nombre_patron1').value = document.getElementById('nombre_patron1_detectar').value;
