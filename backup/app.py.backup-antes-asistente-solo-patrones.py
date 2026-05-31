@@ -1116,55 +1116,6 @@ def generar_carton_multimodal_dirigido(
     raise ValueError(mensaje)
 
 
-def intentar_asignacion_patron_asistente(secuencia, plan, fijas, intentos=35):
-    """
-    Asigna solo las casillas del patrón (el relleno se genera al final en el PDF).
-    """
-    if plan["celdas_patron"] == TODAS_LAS_CELDAS:
-        return generar_asignacion_lleno_con_fijas(
-            secuencia,
-            plan["bola"],
-            fijas,
-            intentos=intentos,
-            solo_casillas_patron=True,
-        )
-    return generar_asignacion_patron_con_fijas(
-        secuencia,
-        plan["bola"],
-        plan["celdas_patron"],
-        fijas,
-        intentos=intentos,
-        solo_casillas_patron=True,
-    )
-
-
-def probar_patron_viable_asistente(secuencia, plan, ganadores_previos, intentos=35):
-    """
-    Viabilidad del asistente: solo casillas del patrón en juego.
-    No exige cartón completo ni relleno (eso ocurre al generar el PDF).
-    """
-    previos = [
-        g
-        for g in ganadores_previos
-        if g["numero_carton"] == plan["numero_carton"]
-    ]
-    fijas = {}
-
-    for prev in ordenar_ganadores_dirigidos(previos):
-        asignacion = intentar_asignacion_patron_asistente(
-            secuencia, prev, fijas, intentos=intentos
-        )
-        if not asignacion:
-            return False
-        for celda in celdas_a_congelar_de_plan(prev):
-            fijas[celda] = asignacion[celda]
-
-    return (
-        intentar_asignacion_patron_asistente(secuencia, plan, fijas, intentos=intentos)
-        is not None
-    )
-
-
 def probar_plan_dirigido_rapido(
     secuencia, plan, ganadores_previos, intentos=15, exploracion=False
 ):
@@ -1254,8 +1205,8 @@ def listar_bolas_viables_asistente(
     limite=50,
 ):
     """
-    Bolas de la secuencia donde al menos un cartón puede ganar este patrón
-    (solo se evalúan las casillas del patrón; el cartón no se arma completo aquí).
+    Bolas de la secuencia donde al menos un cartón puede ganar este patrón,
+    respetando lo ya elegido en pasos anteriores (incluye cartones repetidos).
     """
     min_bola = bola_minima_paso_dirigido(tipo_patron, celdas, ganadores_previos)
     probes = cartones_probar_para_bolas(ganadores_previos, total_cartones)
@@ -1283,8 +1234,8 @@ def listar_bolas_viables_asistente(
             plan = plan_ganador_dirigido(
                 num_carton, bola, tipo_patron, celdas, nombre_patron
             )
-            if probar_patron_viable_asistente(
-                secuencia, plan, ganadores_previos
+            if probar_plan_dirigido_rapido(
+                secuencia, plan, ganadores_previos, exploracion=True
             ):
                 viable_alguno = True
                 break
@@ -1313,13 +1264,15 @@ def listar_cartones_viables_asistente(
 ):
     """
     Cartones que pueden ganar el patrón en la bola elegida.
-    Evalúa solo las casillas del patrón; el resto del cartón sigue sin crear aquí.
+    Solo devuelve los viables (incluye repetir el mismo cartón de un paso anterior).
     """
     previas = ganancias_previas_por_carton(ganadores_previos)
     items = []
     for numero in cartones_candidatos_dirigido(total_cartones):
         plan = plan_ganador_dirigido(numero, bola, tipo_patron, celdas, nombre_patron)
-        if not probar_patron_viable_asistente(secuencia, plan, ganadores_previos):
+        if not probar_plan_dirigido_rapido(
+            secuencia, plan, ganadores_previos, exploracion=True
+        ):
             continue
         items.append(
             {

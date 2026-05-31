@@ -400,8 +400,8 @@
             document.getElementById('wizard-titulo-paso').textContent = paso.nombre;
             document.getElementById('wizard-ayuda-paso').textContent =
                 asistenteDirigido.indice === 0
-                    ? 'Elige bola y cartón(es). Aquí solo se reservan las casillas del patrón; el cartón completo se arma al generar el PDF.'
-                    : 'Cualquier cartón puede salir si sus casillas del patrón encajan. Repetir uno anterior es opcional.';
+                    ? 'Elige bola y cartón(es). Si quieres, puedes usar el mismo cartón en los pasos siguientes.'
+                    : 'Solo aparecen cartones que pueden ganar aquí. Puedes repetir uno que ya ganó antes.';
 
             const previo = asistenteDirigido.seleccion[paso.clave];
             if (previo && previo.bola) {
@@ -507,7 +507,7 @@
 
             renderCartonesWizard(items);
             msg.textContent = data.mensaje ||
-                'Marca cartón(es). Solo se fijan las casillas del patrón; el relleno va al final.';
+                'Marca uno o varios cartones. Opcional: el mismo cartón en varios pasos si sale en la lista.';
             document.getElementById('wizard-siguiente').disabled = true;
             actualizarContadorCartonesWizard();
         }

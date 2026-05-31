@@ -1,0 +1,12 @@
+Copia de seguridad antes del asistente "solo casillas del patrón" (2026).
+
+Para volver a la versión anterior:
+
+1. Copia estos archivos sobre los actuales:
+   - backup/app.py.backup-antes-asistente-solo-patrones.py  →  app.py
+   - backup/index.html.backup-antes-asistente-solo-patrones.html  →  templates/index.html
+
+2. Reinicia el servidor: python app.py
+
+Versión anterior: el asistente probaba cartón completo (patrón + relleno) al listar bolas/cartones.
+Versión nueva: el asistente solo valida casillas del patrón; el PDF sigue generando el cartón completo al final.
