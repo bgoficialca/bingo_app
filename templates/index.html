@@ -102,7 +102,20 @@
 
                     <div id="opciones-dirigido" class="opciones-ganadores">
                         <h3>Modo dirigido</h3>
-                        <p class="ayuda paso-dirigido"><strong>Paso 1:</strong> Secuencia completa de 75 bolas (sin repetir):</p>
+
+                        <section class="reglas-dirigido" aria-label="Reglas del modo dirigido">
+                            <h4>Reglas</h4>
+                            <ol>
+                                <li>Secuencia fija de <strong>75 bolas</strong> (números 1–75 sin repetir).</li>
+                                <li>Marca <strong>Patrón 1</strong> y/o <strong>Patrón 2</strong>; activa los ganadores que necesites.</li>
+                                <li><strong>Orden de bolas:</strong> Patrón 1 &lt; Patrón 2 &lt; cartón lleno (solo patrones activos).</li>
+                                <li><strong>Un cartón = una modalidad:</strong> no repitas el mismo número en dos bloques.</li>
+                                <li>Varios cartones <em>distintos</em> pueden ganar la misma modalidad en la <strong>misma bola</strong>.</li>
+                                <li>En la bola ganadora, el número cantado debe caer en una columna B-I-N-G-O del patrón marcado.</li>
+                            </ol>
+                        </section>
+
+                        <p class="ayuda paso-dirigido"><strong>Paso 1:</strong> Secuencia completa de 75 bolas:</p>
                         <textarea name="secuencia_dirigida" id="secuencia_dirigida"
                             placeholder="1, 5, 12, 18, ... (75 números del 1 al 75)">{{ form.secuencia_dirigida if form else '' }}</textarea>
 
@@ -139,7 +152,7 @@
                             </div>
                         </div>
 
-                        <p class="ayuda paso-dirigido"><strong>Paso 3:</strong> Configura ganadores por patrón. <strong>Regla:</strong> Patrón 1 gana antes que Patrón 2, y ambos antes que cartón lleno (bolas crecientes). Puedes repetir el mismo número de cartón en varios bloques para que gane varias modalidades.</p>
+                        <p class="ayuda paso-dirigido"><strong>Paso 3:</strong> Indica cuántos cartones ganan en cada modalidad activa y en qué bola (compartida por modalidad):</p>
                         <input type="hidden" name="config_dirigido_json" id="config_dirigido_json"
                             value="{{ form.config_dirigido_json if form else '' }}">
 
@@ -195,7 +208,7 @@
                                     min="0" max="30" value="1">
                                 <label class="label-bola-patron" data-patron="lleno">Bola ganadora (compartida)</label>
                                 <input type="number" class="input-bola-patron" data-patron="lleno"
-                                    min="24" max="75" value="55">
+                                    min="24" max="75" value="70">
                                 <p class="ayuda ayuda-bola-compartida">Varios cartones llenos ganan en la misma bolita.</p>
                                 <div class="lista-ganadores-patron" data-patron="lleno"></div>
                             </div>
@@ -276,7 +289,7 @@
 
         let logoPreviewActual = RECURSOS_VERSION['1.0'].logo;
 
-        const BOLAS_DEFAULT = { cuadro: 20, linea: 25, lleno: 55 };
+        const BOLAS_DEFAULT = { cuadro: 20, linea: 25, lleno: 70 };
         const HIDDEN_PATRON = { cuadro: 'patron2_celdas', linea: 'patron1_celdas' };
 
         function recursosDeVersion(version) {
@@ -372,6 +385,51 @@
                     bolaAnterior = parseInt(input.value, 10) || minimo;
                 }
             });
+        }
+
+        /** Valida reglas simplificadas antes de enviar el formulario */
+        function validarReglasDirigido() {
+            serializarConfigDirigido();
+            const vistos = {};
+            const nombres = { cuadro: 'Patrón 1', linea: 'Patrón 2', lleno: 'cartón lleno' };
+            for (const patron of ['cuadro', 'linea', 'lleno']) {
+                if (!patronDirigidoActivo(patron)) continue;
+                const filas = document.querySelectorAll(
+                    '.lista-ganadores-patron[data-patron="' + patron + '"] .input-carton-ganador'
+                );
+                for (const input of filas) {
+                    const numero = parseInt(input.value, 10);
+                    if (vistos[numero]) {
+                        return 'El cartón ' + numero + ' está en «' + vistos[numero] +
+                            '» y también en «' + nombres[patron] + '». Cada cartón solo puede ganar una modalidad.';
+                    }
+                    vistos[numero] = nombres[patron];
+                }
+            }
+            return null;
+        }
+
+        function proximoCartonLibreDirigido(excluirPatron) {
+            const usados = new Set();
+            ['cuadro', 'linea', 'lleno'].forEach(patron => {
+                if (patron === excluirPatron) return;
+                if (!patronDirigidoActivo(patron)) return;
+                document.querySelectorAll(
+                    '.lista-ganadores-patron[data-patron="' + patron + '"] .input-carton-ganador'
+                ).forEach(input => usados.add(parseInt(input.value, 10)));
+            });
+            const config = leerConfigDirigido();
+            if (config) {
+                ['cuadro', 'linea', 'lleno'].forEach(patron => {
+                    if (patron === excluirPatron) return;
+                    const lista = (config[patron] && config[patron].ganadores) || [];
+                    lista.forEach(g => usados.add(g.carton));
+                });
+            }
+            let candidato = 1;
+            const max = totalCartonesFormulario();
+            while (candidato <= max && usados.has(candidato)) candidato++;
+            return Math.min(candidato, max);
         }
 
         function crearCuadriculaPatron(contenedorId, hiddenId) {
@@ -484,7 +542,7 @@
             return {
                 cuadro: { activo: false, bola: 20, ganadores: [] },
                 linea: { activo: false, bola: 25, ganadores: [] },
-                lleno: { activo: true, bola: 55, ganadores: [{ carton: 1, bola: 55 }] }
+                lleno: { activo: true, bola: 70, ganadores: [{ carton: 1, bola: 70 }] }
             };
         }
 
@@ -549,9 +607,15 @@
             }
 
             contenedor.innerHTML = '';
+            let cartonLibre = proximoCartonLibreDirigido(patron);
             for (let i = 0; i < cantidad; i++) {
                 const previo = previos[i] || {};
-                const cartonDefault = previo.carton !== undefined ? previo.carton : Math.min(i + 1, total);
+                let cartonDefault = previo.carton !== undefined ? previo.carton : cartonLibre;
+                while (i > 0 && cartonDefault <= parseInt(previos[i - 1].carton || 0, 10)) {
+                    cartonDefault++;
+                }
+                cartonDefault = Math.min(Math.max(1, cartonDefault), total);
+                cartonLibre = cartonDefault + 1;
 
                 const fila = document.createElement('div');
                 fila.className = 'fila-ganador-dirigido fila-solo-carton';
@@ -652,8 +716,14 @@
         document.getElementById('nombre_patron1_detectar').addEventListener('input', sincronizarPatronesDetectar);
         document.getElementById('nombre_patron2_detectar').addEventListener('input', sincronizarPatronesDetectar);
 
-        document.getElementById('form-bingo').addEventListener('submit', () => {
+        document.getElementById('form-bingo').addEventListener('submit', (e) => {
             if (modoSeleccionado() === 'dirigido') {
+                const errorReglas = validarReglasDirigido();
+                if (errorReglas) {
+                    e.preventDefault();
+                    alert(errorReglas);
+                    return;
+                }
                 serializarConfigDirigido();
             } else if (modoSeleccionado() === 'detectar') {
                 sincronizarPatronesDetectar();
