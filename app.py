@@ -1,6 +1,6 @@
 from flask import Flask, redirect, render_template, request, send_file, url_for, jsonify
 from fpdf import FPDF
-from random import randint, sample
+from random import randint, sample, shuffle
 import json
 import os
 import re
@@ -243,10 +243,14 @@ def numeros_en_carton(numeros_carton):
 
 
 def construir_estructura_carton(mapa_columnas):
-    """Arma el diccionario BINGO ordenado e inserta LOGO en la columna N."""
+    """
+    Arma el diccionario BINGO por columnas.
+    Mezcla al azar las filas de cada columna para que no se vean de menor a mayor.
+    """
     numeros = {}
     for letra in "BINGO":
-        columna = sorted(mapa_columnas[letra])
+        columna = list(mapa_columnas[letra])
+        shuffle(columna)
         if letra == "N":
             columna.insert(2, "LOGO")
         numeros[letra] = columna
@@ -688,26 +692,42 @@ def asignar_celdas_patron_recursivo(
 
 def completar_carton_desde_asignacion(asignacion_celdas):
     """
-    Completa un cartón válido a partir de celdas ya asignadas (patrón ganador).
+    Completa un cartón válido respetando la posición (fila, col) de cada casilla asignada.
+    El relleno va a filas vacías al azar para que la columna no quede ordenada de menor a mayor.
     asignacion_celdas: dict (fila, col) → número
     """
-    mapa = {letra: [] for letra in "BINGO"}
+    numeros = {letra: [None] * 5 for letra in "BINGO"}
+
     for (fila, col), numero in asignacion_celdas.items():
-        mapa[letra_de_celda(fila, col)].append(numero)
+        if (fila, col) == CENTRO_LIBRE:
+            continue
+        letra = letra_de_celda(fila, col)
+        numeros[letra][fila] = numero
 
     for letra in "BINGO":
-        faltantes = CANTIDAD_POR_COLUMNA[letra] - len(mapa[letra])
-        if faltantes < 0:
-            return None
+        if letra == "N":
+            numeros[letra][2] = "LOGO"
+
+        usados = {n for n in numeros[letra] if n is not None and n != "LOGO"}
+        filas_a_llenar = [
+            fila
+            for fila in range(5)
+            if numeros[letra][fila] is None
+        ]
+        faltantes = len(filas_a_llenar)
         if faltantes == 0:
             continue
-        usados = set(mapa[letra])
+
         disponibles = [n for n in RANGOS_COLUMNA[letra] if n not in usados]
         if len(disponibles) < faltantes:
             return None
-        mapa[letra].extend(sample(disponibles, faltantes))
 
-    return construir_estructura_carton(mapa)
+        elegidos = sample(disponibles, faltantes)
+        shuffle(filas_a_llenar)
+        for fila, numero in zip(filas_a_llenar, elegidos):
+            numeros[letra][fila] = numero
+
+    return numeros
 
 
 def ultima_bola_patron(numeros_carton, secuencia, celdas_patron, limite_bola):
