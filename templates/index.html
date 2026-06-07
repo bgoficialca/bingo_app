@@ -12,100 +12,88 @@
             <h1>Cartones de Bingo BG</h1>
         </header>
 
-        <div class="layout-principal">
-            <div class="tarjeta panel-formulario">
-                {% if error %}
-                <div class="alerta-error" role="alert">{{ error }}</div>
-                {% endif %}
+        {% if error %}
+        <div class="alerta-error flujo-alerta-global" role="alert">{{ error }}</div>
+        {% endif %}
 
-                <form action="/" method="POST" id="form-bingo">
-                    <fieldset class="modo-operacion">
-                        <legend>Modo de generación</legend>
-                        {% set modo = form.modo_operacion if form else 'normal' %}
-                        <div class="modo-operacion-grid">
-                        <label class="radio-linea">
-                            <input type="radio" name="modo_operacion" value="normal"
-                                {% if modo == 'normal' %}checked{% endif %}>
-                            Normal (cartones al azar)
-                        </label>
-                        <label class="radio-linea">
-                            <input type="radio" name="modo_operacion" value="detectar"
-                                {% if modo == 'detectar' %}checked{% endif %}>
-                            Detectar ganadores
-                        </label>
-                        <label class="radio-linea">
-                            <input type="radio" name="modo_operacion" value="dirigido"
-                                {% if modo == 'dirigido' %}checked{% endif %}>
-                            Modo dirigido
-                        </label>
-                        <label class="radio-linea">
-                            <input type="radio" name="modo_operacion" value="multisecuencia"
-                                {% if modo == 'multisecuencia' %}checked{% endif %}>
-                            Multisecuencia
-                        </label>
-                        </div>
-                    </fieldset>
+        {% set modo = form.modo_operacion if form else 'normal' %}
 
-                    <div class="grupo-colores">
-                        <div class="campo-color">
-                            <label for="color_carton">Color del cartón</label>
-                            <input type="color" id="color_carton" name="color_carton"
-                                value="{{ form.color_carton if form else '#fe630b' }}" oninput="updatePreview()">
-                        </div>
-                        <div class="campo-color">
-                            <label for="color_bingo">Color de BINGO</label>
-                            <input type="color" id="color_bingo" name="color_bingo"
-                                value="{{ form.color_bingo if form else '#000000' }}" oninput="updatePreview()">
-                        </div>
-                        <div class="campo-color">
-                            <label for="color_enumeracion">Color de numeración</label>
-                            <input type="color" id="color_enumeracion" name="color_enumeracion"
-                                value="{{ form.color_enumeracion if form else '#000000' }}" oninput="updatePreview()">
-                        </div>
-                    </div>
+        <nav class="flujo-stepper" id="flujo-stepper" aria-label="Pasos del asistente">
+            <div class="flujo-stepper-item activo" data-paso="1">
+                <span class="flujo-stepper-num">1</span>
+                <span class="flujo-stepper-texto">Elegir modo</span>
+            </div>
+            <div class="flujo-stepper-linea"></div>
+            <div class="flujo-stepper-item" data-paso="2">
+                <span class="flujo-stepper-num">2</span>
+                <span class="flujo-stepper-texto">Configurar</span>
+            </div>
+            <div class="flujo-stepper-linea"></div>
+            <div class="flujo-stepper-item" data-paso="3">
+                <span class="flujo-stepper-num">3</span>
+                <span class="flujo-stepper-texto">Personalizar</span>
+            </div>
+        </nav>
 
-                    <label for="version">Versión del diseño</label>
-                    <select id="version" name="version">
-                        {% set vsel = form.version if form else '1.0' %}
-                        <option value="1.0" {% if vsel == '1.0' %}selected{% endif %}>Versión 1.0</option>
-                        <option value="2.0" {% if vsel == '2.0' %}selected{% endif %}>Versión 2.0</option>
-                        <option value="halloween 1.0" {% if vsel == 'halloween 1.0' %}selected{% endif %}>Halloween 1.0</option>
-                        <option value="navidad 2.0" {% if vsel == 'navidad 2.0' %}selected{% endif %}>Halloween 2.0</option>
-                        <option value="navidad 1.0" {% if vsel == 'navidad 1.0' %}selected{% endif %}>Navidad 1.0</option>
-                        <option value="navidad 2.0" {% if vsel == 'navidad 2.0' %}selected{% endif %}>Navidad 2.0</option>
-                        <option value="1" {% if vsel == '1' %}selected{% endif %}>Imagen personalizada 1</option>
-                        <option value="2" {% if vsel == '2' %}selected{% endif %}>Imagen personalizada 2</option>
-                        <option value="3" {% if vsel == '3' %}selected{% endif %}>Imagen personalizada 3</option>
-                        <option value="4" {% if vsel == '4' %}selected{% endif %}>Imagen personalizada 4</option>
-                    </select>
+        <form action="/" method="POST" id="form-bingo">
+            <input type="hidden" name="modo_operacion" id="modo_operacion_hidden" value="{{ modo }}">
+            <input type="hidden" name="detectar-ganadores" id="detectar-ganadores-hidden" value="">
 
-                    <div id="bloque-total-cartones">
-                        <label for="total_cartones">Cantidad de cartones</label>
-                        <input type="number" id="total_cartones" name="total_cartones" min="1" max="300"
-                            value="{{ form.total_cartones if form else '6' }}">
-                        <p class="ayuda">El PDF agrupa 6 cartones por página (la última puede ser parcial).</p>
-                    </div>
+            <!-- Paso 1: elegir modo (pantalla aparte) -->
+            <section id="paso-modo" class="flujo-paso flujo-paso-activo" aria-labelledby="titulo-paso-modo">
+                <div class="tarjeta tarjeta-flujo tarjeta-seleccion-modo">
+                    <h2 id="titulo-paso-modo" class="flujo-titulo-paso">¿Qué quieres hacer?</h2>
+                    <p class="flujo-subtitulo">Elige un modo. Luego configurarás la partida y personalizarás el PDF.</p>
 
-                    <label for="nombre_archivo">Nombre del PDF (opcional)</label>
-                    <div class="fila-nombre">
-                        <input type="text" name="nombre_archivo" id="nombre_archivo" maxlength="80"
-                            placeholder="cartones_BG" value="{{ form.nombre_archivo if form else '' }}">
-                        <button type="button" class="btn-secundario" id="btn-nombre-aleatorio" title="Nombre al azar">
-                            🎲 Azar
+                    <div class="grid-tarjetas-modo" role="group" aria-label="Modos de generación">
+                        <button type="button" class="tarjeta-modo{% if modo == 'normal' %} seleccionada{% endif %}" data-modo="normal">
+                            <span class="tarjeta-modo-icono">🎲</span>
+                            <span class="tarjeta-modo-titulo">Normal</span>
+                            <span class="tarjeta-modo-desc">Cartones al azar listos para imprimir.</span>
+                        </button>
+                        <button type="button" class="tarjeta-modo{% if modo == 'detectar' %} seleccionada{% endif %}" data-modo="detectar">
+                            <span class="tarjeta-modo-icono">🔍</span>
+                            <span class="tarjeta-modo-titulo">Detectar ganadores</span>
+                            <span class="tarjeta-modo-desc">Una secuencia y patrones sobre cartones al azar.</span>
+                        </button>
+                        <button type="button" class="tarjeta-modo{% if modo == 'dirigido' %} seleccionada{% endif %}" data-modo="dirigido">
+                            <span class="tarjeta-modo-icono">🎯</span>
+                            <span class="tarjeta-modo-titulo">Modo dirigido</span>
+                            <span class="tarjeta-modo-desc">Diseña quién gana, cuándo y en qué cartón.</span>
+                        </button>
+                        <button type="button" class="tarjeta-modo{% if modo == 'multisecuencia' %} seleccionada{% endif %}" data-modo="multisecuencia">
+                            <span class="tarjeta-modo-icono">📋</span>
+                            <span class="tarjeta-modo-titulo">Multisecuencia</span>
+                            <span class="tarjeta-modo-desc">Un PDF, varias partidas con distintas secuencias.</span>
                         </button>
                     </div>
-                    <p class="ayuda">Vacío = <strong>cartones_BG</strong>. El botón 🎲 agrega un número del 1 al 100.</p>
 
-                    <input type="hidden" name="detectar-ganadores" id="detectar-ganadores-hidden" value="">
+                    <div class="flujo-acciones flujo-acciones-centro">
+                        <button type="button" class="btn-flujo-principal" id="btn-continuar-modo" disabled>
+                            Continuar con este modo →
+                        </button>
+                    </div>
+                </div>
+            </section>
 
-                    <div id="opciones-ganadores" class="opciones-ganadores">
+            <!-- Paso 2: configuración según el modo -->
+            <section id="paso-config" class="flujo-paso" hidden aria-labelledby="titulo-paso-config">
+                <div class="tarjeta tarjeta-flujo">
+                    <p class="flujo-etiqueta-modo" id="etiqueta-modo-activo"></p>
+                    <h2 id="titulo-paso-config" class="flujo-titulo-paso">Configurar partida</h2>
+
+                    <div id="bloque-config-normal" class="bloque-config-modo">
+                        <p class="ayuda-bloque">No necesitas más datos aquí. En el siguiente paso eliges cantidad, colores y diseño del PDF.</p>
+                    </div>
+
+                    <div id="opciones-ganadores" class="opciones-ganadores bloque-config-modo">
                         <h3>Detectar ganadores</h3>
                         <p class="ayuda">Secuencia cantada (números separados por coma):</p>
-                        <textarea name="secuencia_numeros" id="secuencia_numeros" class="textarea-secuencia"
+                        <textarea id="secuencia_numeros" class="textarea-secuencia"
                             placeholder="1, 2, 3, 35, 42, 71...">{{ form.secuencia_numeros if form else '' }}</textarea>
                     </div>
 
-                    <div id="opciones-multisecuencia" class="opciones-ganadores">
+                    <div id="opciones-multisecuencia" class="opciones-ganadores bloque-config-modo">
                         <h3>Multisecuencia</h3>
                         <section class="reglas-dirigido">
                             <p class="ayuda">Un solo PDF de cartones para varias partidas. La <strong>secuencia 1</strong> genera el PDF; las siguientes usan los mismos cartones con otras bolas y patrones.</p>
@@ -131,12 +119,12 @@
                         </div>
                         <div id="ms-panel-detectar" class="ms-subpanel">
                             <p class="ayuda"><strong>Secuencia 1 — detectar</strong> (75 bolas):</p>
-                            <textarea name="secuencia_numeros" id="secuencia_numeros_ms" class="textarea-secuencia"
+                            <textarea id="secuencia_numeros_ms" class="textarea-secuencia"
                                 placeholder="1, 2, 3, ... (75 números)">{{ form.secuencia_numeros if form else '' }}</textarea>
                         </div>
                     </div>
 
-                    <div id="opciones-dirigido" class="opciones-ganadores">
+                    <div id="opciones-dirigido" class="opciones-ganadores bloque-config-modo">
                         <h3>Modo dirigido</h3>
 
                         <section class="reglas-dirigido" aria-label="Cómo funciona el asistente">
@@ -247,7 +235,7 @@
                         </div>
                     </div>
 
-                    <div id="opciones-patrones" class="opciones-ganadores">
+                    <div id="opciones-patrones" class="opciones-ganadores bloque-config-modo">
                         <h3>Patrones de ganar</h3>
                         <p class="ayuda">Marca las formas y ponles nombre. <strong>Cartón lleno</strong> siempre activo.</p>
 
@@ -282,28 +270,114 @@
                         </p>
                     </div>
 
-                    <button type="submit" class="btn-principal" id="btn-generar">Generar y descargar PDF</button>
-                </form>
-            </div>
-
-            <div class="tarjeta panel-preview">
-                <h2>Vista previa</h2>
-                <p class="ayuda-preview">Igual que en el PDF: marca de agua, logo en el centro libre y colores elegidos.</p>
-                <div class="preview-contenedor" id="previewContenedor">
-                    <img class="preview-watermark" id="previewWatermark" alt="" aria-hidden="true">
-                    <div class="carton-preview" id="cartonPreview">
-                        <div class="bingo-fila" id="bingoText">
-                            <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
-                        </div>
-                        <div class="numeros" id="numerosPreview"></div>
-                        <div class="enumeracion" id="enumeracionText">Cartón 1</div>
+                    <div class="flujo-acciones">
+                        <button type="button" class="btn-flujo-atras" data-ir-paso="1">← Cambiar modo</button>
+                        <button type="button" class="btn-flujo-principal" id="btn-ir-personalizar">Personalizar PDF →</button>
                     </div>
                 </div>
-                <button type="button" class="btn-secundario btn-refrescar-preview" id="btn-refrescar-preview">
-                    🔄 Otro cartón de muestra
-                </button>
-            </div>
-        </div>
+            </section>
+
+            <!-- Paso 3: personalización + vista previa -->
+            <section id="paso-personalizar" class="flujo-paso" hidden aria-labelledby="titulo-paso-personalizar">
+                <div class="layout-personalizar">
+                    <div class="tarjeta tarjeta-flujo columna-personalizar">
+                        <h2 id="titulo-paso-personalizar" class="flujo-titulo-paso">Personalizar cartones</h2>
+                        <p class="flujo-subtitulo">Colores, diseño y nombre del archivo. La vista previa se actualiza al instante.</p>
+
+                        <div class="resumen-flujo" id="resumen-flujo" aria-live="polite"></div>
+
+                        <fieldset class="grupo-personalizar">
+                            <legend>Paleta de colores</legend>
+                            <div class="presets-colores" id="presets-colores">
+                                <button type="button" class="chip-preset" data-preset="clasico">Clásico BG</button>
+                                <button type="button" class="chip-preset" data-preset="azul">Azul</button>
+                                <button type="button" class="chip-preset" data-preset="verde">Verde</button>
+                                <button type="button" class="chip-preset" data-preset="morado">Morado</button>
+                                <button type="button" class="chip-preset chip-preset-reset" data-preset="reset">Restaurar</button>
+                            </div>
+                            <div class="grupo-colores grupo-colores-claro">
+                                <div class="campo-color">
+                                    <label for="color_carton">Fondo del cartón</label>
+                                    <input type="color" id="color_carton" name="color_carton"
+                                        value="{{ form.color_carton if form else '#fe630b' }}" oninput="updatePreview()">
+                                </div>
+                                <div class="campo-color">
+                                    <label for="color_bingo">Letras BINGO</label>
+                                    <input type="color" id="color_bingo" name="color_bingo"
+                                        value="{{ form.color_bingo if form else '#000000' }}" oninput="updatePreview()">
+                                </div>
+                                <div class="campo-color">
+                                    <label for="color_enumeracion">Numeración</label>
+                                    <input type="color" id="color_enumeracion" name="color_enumeracion"
+                                        value="{{ form.color_enumeracion if form else '#000000' }}" oninput="updatePreview()">
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="grupo-personalizar">
+                            <legend>Diseño y marca de agua</legend>
+                            <select id="version" name="version" class="select-version-oculto" aria-hidden="true" tabindex="-1">
+                                {% set vsel = form.version if form else '1.0' %}
+                                <option value="1.0" {% if vsel == '1.0' %}selected{% endif %}>1.0</option>
+                                <option value="2.0" {% if vsel == '2.0' %}selected{% endif %}>2.0</option>
+                                <option value="halloween 1.0" {% if vsel == 'halloween 1.0' %}selected{% endif %}>Halloween 1.0</option>
+                                <option value="navidad 2.0" {% if vsel == 'navidad 2.0' %}selected{% endif %}>Navidad 2.0</option>
+                                <option value="navidad 1.0" {% if vsel == 'navidad 1.0' %}selected{% endif %}>Navidad 1.0</option>
+                                <option value="1" {% if vsel == '1' %}selected{% endif %}>Personalizada 1</option>
+                                <option value="2" {% if vsel == '2' %}selected{% endif %}>Personalizada 2</option>
+                                <option value="3" {% if vsel == '3' %}selected{% endif %}>Personalizada 3</option>
+                                <option value="4" {% if vsel == '4' %}selected{% endif %}>Personalizada 4</option>
+                            </select>
+                            <div class="grid-versiones" id="grid-versiones" role="radiogroup" aria-label="Versión del diseño"></div>
+                        </fieldset>
+
+                        <fieldset class="grupo-personalizar">
+                            <legend>Cantidad y archivo</legend>
+                            <div id="bloque-total-cartones" class="fila-cantidad-cartones">
+                                <label for="total_cartones">Cartones en el PDF</label>
+                                <div class="control-cantidad">
+                                    <button type="button" class="btn-cantidad" id="btn-menos-cartones" aria-label="Menos cartones">−</button>
+                                    <input type="number" id="total_cartones" name="total_cartones" min="1" max="300"
+                                        value="{{ form.total_cartones if form else '6' }}">
+                                    <button type="button" class="btn-cantidad" id="btn-mas-cartones" aria-label="Más cartones">+</button>
+                                </div>
+                                <p class="ayuda ayuda-inline" id="ayuda-paginas-pdf">6 por página · estimado: 1 pág.</p>
+                            </div>
+                            <label for="nombre_archivo">Nombre del PDF</label>
+                            <div class="fila-nombre fila-nombre-claro">
+                                <input type="text" name="nombre_archivo" id="nombre_archivo" maxlength="80"
+                                    placeholder="cartones_BG" value="{{ form.nombre_archivo if form else '' }}">
+                                <button type="button" class="btn-secundario btn-secundario-oscuro" id="btn-nombre-aleatorio" title="Nombre al azar">🎲</button>
+                            </div>
+                            <p class="ayuda ayuda-inline">Vacío = <strong>cartones_BG</strong></p>
+                        </fieldset>
+
+                        <div class="flujo-acciones flujo-acciones-final">
+                            <button type="button" class="btn-flujo-atras" data-ir-paso="2">← Volver a configurar</button>
+                            <button type="submit" class="btn-flujo-generar" id="btn-generar">Generar y descargar PDF</button>
+                        </div>
+                    </div>
+
+                    <div class="tarjeta panel-preview panel-preview-flujo">
+                        <h2>Vista previa en vivo</h2>
+                        <p class="ayuda-preview">Así se verá cada cartón en el PDF.</p>
+                        <div class="preview-contenedor" id="previewContenedor">
+                            <img class="preview-watermark" id="previewWatermark" alt="" aria-hidden="true">
+                            <div class="carton-preview" id="cartonPreview">
+                                <div class="bingo-fila" id="bingoText">
+                                    <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+                                </div>
+                                <div class="numeros" id="numerosPreview"></div>
+                                <div class="enumeracion" id="enumeracionText">Cartón 1</div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-secundario btn-refrescar-preview btn-secundario-oscuro" id="btn-refrescar-preview">
+                            🔄 Otro cartón de muestra
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </form>
     </div>
 
     <script>
@@ -353,7 +427,10 @@
 
         function actualizarBotonGenerarDirigido() {
             const btn = document.getElementById('btn-generar');
-            if (modoSeleccionado() !== 'dirigido') return;
+            const modo = modoSeleccionado();
+            const msDirigido = modo === 'multisecuencia' &&
+                document.getElementById('multisecuencia_dirigido').checked;
+            if (modo !== 'dirigido' && !msDirigido) return;
             if (asistenteDirigido.listo) {
                 btn.textContent = 'Generar cartones dirigidos y verificar';
                 btn.disabled = false;
@@ -707,9 +784,232 @@
             }
         }
 
+        const ETIQUETAS_MODO = {
+            normal: { titulo: 'Cartones al azar', etiqueta: 'Modo normal' },
+            detectar: { titulo: 'Detectar ganadores', etiqueta: 'Modo detectar' },
+            dirigido: { titulo: 'Partida dirigida', etiqueta: 'Modo dirigido' },
+            multisecuencia: { titulo: 'Multisecuencia', etiqueta: 'Multisecuencia' }
+        };
+
+        const VERSIONES_UI = [
+            { id: '1.0', nombre: 'Clásica 1.0' },
+            { id: '2.0', nombre: 'Clásica 2.0' },
+            { id: 'halloween 1.0', nombre: 'Halloween' },
+            { id: 'navidad 1.0', nombre: 'Navidad 1.0' },
+            { id: 'navidad 2.0', nombre: 'Navidad 2.0' },
+            { id: '1', nombre: 'Personalizada 1' },
+            { id: '2', nombre: 'Personalizada 2' },
+            { id: '3', nombre: 'Personalizada 3' },
+            { id: '4', nombre: 'Personalizada 4' }
+        ];
+
+        const PRESETS_COLOR = {
+            clasico: { carton: '#fe630b', bingo: '#000000', enumeracion: '#000000' },
+            azul: { carton: '#4a90d9', bingo: '#1a3a5c', enumeracion: '#1a3a5c' },
+            verde: { carton: '#2d8a5b', bingo: '#0d3d28', enumeracion: '#0d3d28' },
+            morado: { carton: '#7b5ea7', bingo: '#3d2a5c', enumeracion: '#3d2a5c' },
+            reset: { carton: '#fe630b', bingo: '#000000', enumeracion: '#000000' }
+        };
+
+        const flujoApp = { paso: 1 };
+
         function modoSeleccionado() {
-            const marcado = document.querySelector('input[name="modo_operacion"]:checked');
-            return marcado ? marcado.value : 'normal';
+            const hidden = document.getElementById('modo_operacion_hidden');
+            return hidden ? hidden.value : 'normal';
+        }
+
+        function seleccionarModoTarjeta(modo) {
+            document.getElementById('modo_operacion_hidden').value = modo;
+            document.querySelectorAll('.tarjeta-modo').forEach(t => {
+                t.classList.toggle('seleccionada', t.dataset.modo === modo);
+            });
+            document.getElementById('btn-continuar-modo').disabled = false;
+        }
+
+        function irAPaso(num) {
+            flujoApp.paso = num;
+            ['paso-modo', 'paso-config', 'paso-personalizar'].forEach((id, idx) => {
+                const el = document.getElementById(id);
+                const activo = idx + 1 === num;
+                el.hidden = !activo;
+                el.classList.toggle('flujo-paso-activo', activo);
+            });
+            document.querySelectorAll('.flujo-stepper-item').forEach(item => {
+                const n = parseInt(item.dataset.paso, 10);
+                item.classList.toggle('activo', n === num);
+                item.classList.toggle('completado', n < num);
+            });
+            if (num === 2) prepararPasoConfig();
+            if (num === 3) prepararPasoPersonalizar();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function prepararPasoConfig() {
+            const modo = modoSeleccionado();
+            const info = ETIQUETAS_MODO[modo] || ETIQUETAS_MODO.normal;
+            document.getElementById('etiqueta-modo-activo').textContent = info.etiqueta;
+            document.getElementById('titulo-paso-config').textContent = info.titulo;
+            toggleModos();
+        }
+
+        function prepararPasoPersonalizar() {
+            actualizarResumenFlujo();
+            actualizarAyudaPaginas();
+            actualizarBotonGenerarTexto();
+            updatePreview();
+        }
+
+        /** Asigna name="secuencia_numeros" solo al textarea activo según modo (evita duplicados en POST). */
+        function sincronizarCampoSecuencia() {
+            const det = document.getElementById('secuencia_numeros');
+            const ms = document.getElementById('secuencia_numeros_ms');
+            const modo = modoSeleccionado();
+            const msDetectar = modo === 'multisecuencia' &&
+                !document.getElementById('multisecuencia_dirigido').checked;
+            det.removeAttribute('name');
+            ms.removeAttribute('name');
+            if (modo === 'detectar') det.name = 'secuencia_numeros';
+            else if (msDetectar) ms.name = 'secuencia_numeros';
+        }
+
+        function actualizarResumenFlujo() {
+            const modo = modoSeleccionado();
+            const info = ETIQUETAS_MODO[modo] || ETIQUETAS_MODO.normal;
+            const total = totalCartonesFormulario();
+            const paginas = Math.max(1, Math.ceil(total / 6));
+            const versionSel = document.getElementById('version');
+            const versionNombre = VERSIONES_UI.find(v => v.id === versionSel.value)?.nombre || versionSel.value;
+            const nombrePdf = document.getElementById('nombre_archivo').value.trim() || 'cartones_BG';
+            let extra = '';
+            if (modo === 'multisecuencia') {
+                const nSeq = document.getElementById('multisecuencia_total').value;
+                const dirigido = document.getElementById('multisecuencia_dirigido').checked;
+                extra = '<p><strong>Secuencias:</strong> ' + nSeq +
+                    (dirigido ? ' · sec. 1 dirigida' : ' · sec. 1 detectar') + '</p>';
+            }
+            document.getElementById('resumen-flujo').innerHTML =
+                '<p><strong>Modo:</strong> ' + info.etiqueta + '</p>' +
+                extra +
+                '<p><strong>Cartones:</strong> ' + total + ' · <strong>Páginas PDF:</strong> ~' + paginas + '</p>' +
+                '<p><strong>Diseño:</strong> ' + versionNombre + ' · <strong>Archivo:</strong> ' + nombrePdf + '.pdf</p>';
+        }
+
+        function actualizarAyudaPaginas() {
+            const total = totalCartonesFormulario();
+            const paginas = Math.max(1, Math.ceil(total / 6));
+            const el = document.getElementById('ayuda-paginas-pdf');
+            if (el) el.textContent = '6 cartones por página · estimado: ' + paginas + ' pág.';
+        }
+
+        function actualizarBotonGenerarTexto() {
+            const btn = document.getElementById('btn-generar');
+            const modo = modoSeleccionado();
+            if (modo === 'multisecuencia') {
+                btn.textContent = document.getElementById('multisecuencia_dirigido').checked
+                    ? 'Iniciar multisecuencia (dirigida)'
+                    : 'Iniciar multisecuencia';
+                btn.disabled = false;
+            } else if (modo === 'dirigido') {
+                actualizarBotonGenerarDirigido();
+            } else if (modo === 'detectar') {
+                btn.textContent = 'Generar y ver ganadores';
+                btn.disabled = false;
+            } else {
+                btn.textContent = 'Generar y descargar PDF';
+                btn.disabled = false;
+            }
+        }
+
+        function validarAntesDePersonalizar() {
+            const modo = modoSeleccionado();
+            if (modo === 'detectar') {
+                sincronizarPatronesDetectar();
+                document.getElementById('nombre_patron1').value = document.getElementById('nombre_patron1_detectar').value;
+                document.getElementById('nombre_patron2').value = document.getElementById('nombre_patron2_detectar').value;
+            }
+            if (modo === 'dirigido') {
+                if (!asistenteDirigido.listo) {
+                    alert('Completa el asistente dirigido antes de personalizar el PDF.');
+                    return false;
+                }
+                serializarConfigDesdeAsistente();
+            }
+            if (modo === 'multisecuencia' && document.getElementById('multisecuencia_dirigido').checked) {
+                if (!asistenteDirigido.listo) {
+                    alert('Completa el asistente de la secuencia 1 antes de continuar.');
+                    return false;
+                }
+                serializarConfigDesdeAsistente();
+            }
+            if (modo === 'multisecuencia' && !document.getElementById('multisecuencia_dirigido').checked) {
+                sincronizarPatronesDetectar();
+                document.getElementById('nombre_patron1').value = document.getElementById('nombre_patron1_detectar').value;
+                document.getElementById('nombre_patron2').value = document.getElementById('nombre_patron2_detectar').value;
+            }
+            return true;
+        }
+
+        function initGridVersiones() {
+            const grid = document.getElementById('grid-versiones');
+            const select = document.getElementById('version');
+            if (!grid || grid.dataset.inicializado) return;
+            grid.dataset.inicializado = '1';
+            VERSIONES_UI.forEach(v => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'tarjeta-version' + (select.value === v.id ? ' seleccionada' : '');
+                btn.dataset.version = v.id;
+                btn.textContent = v.nombre;
+                btn.addEventListener('click', () => {
+                    select.value = v.id;
+                    grid.querySelectorAll('.tarjeta-version').forEach(t => {
+                        t.classList.toggle('seleccionada', t.dataset.version === v.id);
+                    });
+                    updatePreview();
+                    if (flujoApp.paso === 3) actualizarResumenFlujo();
+                });
+                grid.appendChild(btn);
+            });
+        }
+
+        function aplicarPresetColor(preset) {
+            const colores = PRESETS_COLOR[preset];
+            if (!colores) return;
+            document.getElementById('color_carton').value = colores.carton;
+            document.getElementById('color_bingo').value = colores.bingo;
+            document.getElementById('color_enumeracion').value = colores.enumeracion;
+            updatePreview();
+        }
+
+        function inicializarFlujoUI() {
+            initGridVersiones();
+            seleccionarModoTarjeta(modoSeleccionado());
+            document.querySelectorAll('.tarjeta-modo').forEach(btn => {
+                btn.addEventListener('click', () => seleccionarModoTarjeta(btn.dataset.modo));
+            });
+            document.getElementById('btn-continuar-modo').addEventListener('click', () => irAPaso(2));
+            document.getElementById('btn-ir-personalizar').addEventListener('click', () => {
+                if (validarAntesDePersonalizar()) irAPaso(3);
+            });
+            document.querySelectorAll('[data-ir-paso]').forEach(btn => {
+                btn.addEventListener('click', () => irAPaso(parseInt(btn.dataset.irPaso, 10)));
+            });
+            document.querySelectorAll('.chip-preset').forEach(chip => {
+                chip.addEventListener('click', () => aplicarPresetColor(chip.dataset.preset));
+            });
+            document.getElementById('btn-menos-cartones').addEventListener('click', () => {
+                const inp = document.getElementById('total_cartones');
+                inp.value = Math.max(1, parseInt(inp.value, 10) - 1 || 1);
+                actualizarAyudaPaginas();
+                actualizarResumenFlujo();
+            });
+            document.getElementById('btn-mas-cartones').addEventListener('click', () => {
+                const inp = document.getElementById('total_cartones');
+                inp.value = Math.min(300, parseInt(inp.value, 10) + 1 || 6);
+                actualizarAyudaPaginas();
+                actualizarResumenFlujo();
+            });
+            {% if error %}irAPaso(2);{% endif %}
         }
 
         function totalCartonesFormulario() {
@@ -817,75 +1117,73 @@
         }
 
         function actualizarPanelMultisecuencia() {
-            const panelMs = document.getElementById('opciones-multisecuencia');
             const checkDirigido = document.getElementById('multisecuencia_dirigido');
             const panelDirigido = document.getElementById('opciones-dirigido');
             const panelPatrones = document.getElementById('opciones-patrones');
-            const panelDetectar = document.getElementById('opciones-ganadores');
             const msDetectar = document.getElementById('ms-panel-detectar');
-            const btn = document.getElementById('btn-generar');
             if (modoSeleccionado() !== 'multisecuencia') return;
 
             const usarDirigido = checkDirigido && checkDirigido.checked;
-            panelDirigido.classList.toggle('visible', usarDirigido);
-            panelPatrones.classList.toggle('visible', !usarDirigido);
-            panelDetectar.classList.remove('visible');
+            panelDirigido.classList.toggle('activo', usarDirigido);
+            panelPatrones.classList.toggle('activo', !usarDirigido);
             if (msDetectar) msDetectar.hidden = usarDirigido;
 
             if (usarDirigido) {
-                actualizarBotonGenerarDirigido();
-                btn.textContent = 'Iniciar multisecuencia (secuencia 1 dirigida)';
+                reiniciarAsistenteDirigido(true);
+                crearCuadriculaPatron('grid-patron1', 'patron1_celdas');
+                crearCuadriculaPatron('grid-patron2', 'patron2_celdas');
             } else {
-                btn.textContent = 'Iniciar multisecuencia (secuencia 1)';
-                btn.disabled = false;
                 crearCuadriculaPatronDetectar('grid-patron1-detectar', 'patron1_celdas');
                 crearCuadriculaPatronDetectar('grid-patron2-detectar', 'patron2_celdas');
                 sincronizarPatronesDetectar();
             }
+            if (flujoApp.paso === 3) actualizarBotonGenerarTexto();
         }
 
         function toggleModos() {
             const modo = modoSeleccionado();
-            const panelDetectar = document.getElementById('opciones-ganadores');
-            const panelDirigido = document.getElementById('opciones-dirigido');
-            const panelMultisecuencia = document.getElementById('opciones-multisecuencia');
-            const panelPatrones = document.getElementById('opciones-patrones');
-            const btn = document.getElementById('btn-generar');
             const hiddenDetectar = document.getElementById('detectar-ganadores-hidden');
 
-            panelMultisecuencia.classList.toggle('visible', modo === 'multisecuencia');
-            panelDetectar.classList.toggle('visible', modo === 'detectar');
-            panelDirigido.classList.toggle('visible', modo === 'dirigido');
-            panelPatrones.classList.toggle('visible', modo === 'detectar');
+            document.querySelectorAll('.bloque-config-modo').forEach(b => b.classList.remove('activo'));
             hiddenDetectar.value = modo === 'detectar' ? 'on' : '';
+            sincronizarCampoSecuencia();
 
-            if (modo === 'multisecuencia') {
-                actualizarPanelMultisecuencia();
+            if (modo === 'normal') {
+                document.getElementById('bloque-config-normal').classList.add('activo');
             } else if (modo === 'detectar') {
-                btn.textContent = 'Generar y ver ganadores';
-                btn.disabled = false;
+                document.getElementById('opciones-ganadores').classList.add('activo');
+                document.getElementById('opciones-patrones').classList.add('activo');
                 crearCuadriculaPatronDetectar('grid-patron1-detectar', 'patron1_celdas');
                 crearCuadriculaPatronDetectar('grid-patron2-detectar', 'patron2_celdas');
                 sincronizarPatronesDetectar();
             } else if (modo === 'dirigido') {
+                document.getElementById('opciones-dirigido').classList.add('activo');
                 reiniciarAsistenteDirigido(true);
                 crearCuadriculaPatron('grid-patron1', 'patron1_celdas');
                 crearCuadriculaPatron('grid-patron2', 'patron2_celdas');
-                actualizarBotonGenerarDirigido();
-            } else {
-                btn.textContent = 'Generar y descargar PDF';
-                btn.disabled = false;
+            } else if (modo === 'multisecuencia') {
+                document.getElementById('opciones-multisecuencia').classList.add('activo');
+                actualizarPanelMultisecuencia();
             }
+
+            sincronizarCampoSecuencia();
+            if (flujoApp.paso === 3) actualizarBotonGenerarTexto();
         }
 
-        document.getElementById('version').addEventListener('change', updatePreview);
+        document.getElementById('version').addEventListener('change', () => {
+            updatePreview();
+            if (flujoApp.paso === 3) actualizarResumenFlujo();
+        });
         document.getElementById('btn-refrescar-preview').addEventListener('click', cargarCartonMuestra);
         document.getElementById('btn-nombre-aleatorio').addEventListener('click', () => {
             document.getElementById('nombre_archivo').value = 'cartones_BG (' + (Math.floor(Math.random() * 100) + 1) + ')';
+            if (flujoApp.paso === 3) actualizarResumenFlujo();
         });
-
-        document.querySelectorAll('input[name="modo_operacion"]').forEach(radio => {
-            radio.addEventListener('change', toggleModos);
+        document.getElementById('nombre_archivo').addEventListener('input', () => {
+            if (flujoApp.paso === 3) actualizarResumenFlujo();
+        });
+        document.getElementById('multisecuencia_total')?.addEventListener('change', () => {
+            if (flujoApp.paso === 3) actualizarResumenFlujo();
         });
 
         document.querySelectorAll('.patron-activo-check').forEach(check => {
@@ -926,6 +1224,8 @@
         });
 
         document.getElementById('total_cartones').addEventListener('input', () => {
+            actualizarAyudaPaginas();
+            if (flujoApp.paso === 3) actualizarResumenFlujo();
             if (modoSeleccionado() === 'dirigido') {
                 reiniciarAsistenteDirigido(true);
             }
@@ -990,6 +1290,7 @@
         crearCuadriculaPatronDetectar('grid-patron2-detectar', 'patron2_celdas');
 
         toggleModos();
+        inicializarFlujoUI();
         cargarCartonMuestra();
     </script>
 </body>
