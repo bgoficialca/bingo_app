@@ -1047,3 +1047,76 @@ body {
         box-sizing: border-box;
     }
 }
+
+/* --- Modo multisecuencia --- */
+.encabezado-multisecuencia .ms-indicador-secuencia {
+    margin: 8px 0 12px;
+    font-size: 1.05rem;
+    color: #333;
+}
+
+.ms-barra-descarga {
+    margin-bottom: 8px;
+}
+
+.btn-descargar-compacto {
+    display: inline-block;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
+.ms-acciones-siguiente {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e8e8e8;
+}
+
+.ms-zona-final {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.btn-resumen-ms {
+    background: #2c5f8a;
+}
+
+.form-empezar-cero {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed #ccc;
+}
+
+.ms-lista-resumen-secuencias {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 16px 0;
+}
+
+.ms-tarjeta-secuencia-resumen {
+    padding: 14px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #fe630b;
+}
+
+.ms-tarjeta-secuencia-resumen h3 {
+    margin: 0 0 8px;
+}
+
+.ms-tarjeta-secuencia-resumen ul {
+    margin: 8px 0 0;
+    padding-left: 1.2rem;
+}
+
+.ms-check-dirigido {
+    display: block;
+    margin: 12px 0 8px;
+}
+
+#opciones-multisecuencia select {
+    max-width: 220px;
+    margin-bottom: 8px;
+}

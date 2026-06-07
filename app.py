@@ -162,6 +162,351 @@ def cargar_sesion_resultados(token):
         return json.load(archivo)
 
 
+# --- Sesión modo multisecuencia (varias secuencias, un PDF de cartones) ---
+
+MAX_SECUENCIAS_MULTIS = 10
+
+
+def ruta_meta_multisecuencia(token):
+    return os.path.join(tempfile.gettempdir(), f"bingo_ms_{token_seguro(token)}.json")
+
+
+def ruta_resumen_multisecuencia(token):
+    return os.path.join(
+        tempfile.gettempdir(), f"bingo_ms_resumen_{token_seguro(token)}.pdf"
+    )
+
+
+def guardar_sesion_multisecuencia(token, sesion):
+    with open(ruta_meta_multisecuencia(token), "w", encoding="utf-8") as archivo:
+        json.dump(sesion, archivo, ensure_ascii=False)
+
+
+def cargar_sesion_multisecuencia(token):
+    ruta = ruta_meta_multisecuencia(token)
+    if not os.path.isfile(ruta):
+        return None
+    with open(ruta, "r", encoding="utf-8") as archivo:
+        return json.load(archivo)
+
+
+def publicar_multisecuencia(pdf_path, nombre_base, sesion):
+    """Guarda el PDF de cartones y la sesión multisecuencia."""
+    token = secrets.token_urlsafe(16)
+    destino = ruta_pdf_token(token)
+    shutil.copy2(pdf_path, destino)
+    sesion["nombre_base"] = nombre_base
+    guardar_sesion_multisecuencia(token, sesion)
+    return token
+
+
+def serializar_cartones_para_sesion(secuencia_cartones):
+    """Convierte cartones a JSON almacenable (misma estructura que el PDF)."""
+    resultado = []
+    for carton in secuencia_cartones:
+        nums = carton["numeros"]
+        resultado.append(
+            {
+                "numero": carton["numero"],
+                "numeros": {letra: list(nums[letra]) for letra in "BINGO"},
+            }
+        )
+    return resultado
+
+
+def deserializar_cartones_desde_sesion(datos):
+    """Reconstruye cartones desde la sesión guardada."""
+    return [
+        {
+            "numero": item["numero"],
+            "numeros": {letra: list(item["numeros"][letra]) for letra in "BINGO"},
+        }
+        for item in datos
+    ]
+
+
+def validar_total_secuencias_multisecuencia(valor):
+    try:
+        total = int(valor)
+    except (TypeError, ValueError):
+        raise ValueError("Indica cuántas secuencias usarás (entre 1 y 10).")
+    if total < 1 or total > MAX_SECUENCIAS_MULTIS:
+        raise ValueError(
+            f"El número de secuencias debe estar entre 1 y {MAX_SECUENCIAS_MULTIS}."
+        )
+    return total
+
+
+def celdas_patron_a_texto(celdas):
+    """Serializa un conjunto de celdas para guardar en la sesión."""
+    if not celdas:
+        return ""
+    return ";".join(f"{fila},{col}" for fila, col in sorted(celdas))
+
+
+def registro_secuencia_multisecuencia(
+    numero,
+    tipo_generacion,
+    secuencia_llamados,
+    patron1,
+    patron2,
+    nombre1,
+    nombre2,
+    resumen,
+    verificacion_dirigida=None,
+):
+    """Arma el bloque de datos de una secuencia analizada."""
+    entrada = {
+        "numero": numero,
+        "tipo_generacion": tipo_generacion,
+        "secuencia_texto": ", ".join(str(n) for n in secuencia_llamados),
+        "patrones": {
+            "patron1_celdas": celdas_patron_a_texto(patron1),
+            "patron2_celdas": celdas_patron_a_texto(patron2),
+            "nombre_patron1": nombre1,
+            "nombre_patron2": nombre2,
+        },
+        "resumen": resumen,
+    }
+    if verificacion_dirigida is not None:
+        entrada["verificacion_dirigida"] = verificacion_dirigida
+    return entrada
+
+
+def analizar_secuencia_sobre_cartones(
+    secuencia_cartones, secuencia_texto, patron1, nombre1, patron2, nombre2
+):
+    """Detecta ganadores con cartones fijos y secuencia de 75 bolas."""
+    secuencia_llamados = parsear_secuencia_numeros(secuencia_texto)
+    validar_secuencia_modo_dirigido(secuencia_llamados)
+    _, modos = validar_configuracion_ganadores(
+        secuencia_texto, patron1, nombre1, patron2, nombre2
+    )
+    ganadores = detectar_ganadores(secuencia_cartones, secuencia_llamados, modos)
+    resumen = preparar_resumen_ganadores(modos, ganadores)
+    resumen["total_cartones"] = len(secuencia_cartones)
+    resumen["secuencia_texto"] = ", ".join(str(n) for n in secuencia_llamados)
+    return secuencia_llamados, resumen
+
+
+def _ejecutar_secuencia1_multisecuencia_dirigido(form, total_cartones):
+    """Secuencia 1 con asistente dirigido: genera cartones diseñados."""
+    color_carton = form.get("color_carton", "#fe630b")
+    color_bingo = form.get("color_bingo", "#000000")
+    color_enumeracion = form.get("color_enumeracion", "#000000")
+    version = form.get("version", "1.0")
+    nombre_base = resolver_nombre_base(form.get("nombre_archivo", ""))
+
+    secuencia_llamados = parsear_secuencia_numeros(form.get("secuencia_dirigida", ""))
+    validar_secuencia_modo_dirigido(secuencia_llamados)
+
+    patron1 = parsear_patron_celdas(form.get("patron1_celdas", ""))
+    patron2 = parsear_patron_celdas(form.get("patron2_celdas", ""))
+    nombre1 = form.get("nombre_patron1", "").strip()
+    nombre2 = form.get("nombre_patron2", "").strip()
+
+    config_json = form.get("config_dirigido_json", "")
+    ganadores_config = parsear_config_dirigido(
+        config_json, total_cartones, patron1, nombre1, patron2, nombre2
+    )
+    _, modos = validar_configuracion_ganadores(
+        form.get("secuencia_dirigida", ""), patron1, nombre1, patron2, nombre2
+    )
+
+    secuencia_cartones = generar_cartones_modo_dirigido(
+        secuencia_llamados, ganadores_config, total_cartones
+    )
+
+    for plan in ganadores_config:
+        plan["numero_cantado"] = secuencia_llamados[plan["bola"] - 1]
+
+    verificacion = verificar_ganadores_planeados(
+        ganadores_config, secuencia_cartones, secuencia_llamados
+    )
+    resumen = preparar_resumen_ganadores_dirigido(ganadores_config, modos)
+    resumen["verificacion_dirigida"] = verificacion
+    resumen["modo_dirigido"] = True
+    resumen["total_cartones"] = len(secuencia_cartones)
+    resumen["secuencia_texto"] = ", ".join(str(n) for n in secuencia_llamados)
+
+    pdf_path, nombre_base, _ = generar_pdf_personalizado(
+        color_carton,
+        color_bingo,
+        color_enumeracion,
+        version,
+        secuencia_cartones=secuencia_cartones,
+        total_cartones=total_cartones,
+        nombre_base=nombre_base,
+    )
+
+    registro = registro_secuencia_multisecuencia(
+        1,
+        "dirigido",
+        secuencia_llamados,
+        patron1,
+        patron2,
+        nombre1,
+        nombre2,
+        resumen,
+        verificacion_dirigida=verificacion,
+    )
+    return pdf_path, nombre_base, secuencia_cartones, registro
+
+
+def _ejecutar_secuencia1_multisecuencia_detectar(form, total_cartones):
+    """Secuencia 1 al azar + detectar (sin asistente dirigido)."""
+    config = _config_regenerar_detectar(form)
+    secuencia_llamados = parsear_secuencia_numeros(config.get("secuencia_numeros", ""))
+    validar_secuencia_modo_dirigido(secuencia_llamados)
+
+    pdf_path, nombre_base, resumen, secuencia_cartones = _ejecutar_modo_detectar(config)
+
+    patron1 = parsear_patron_celdas(config.get("patron1_celdas", ""))
+    patron2 = parsear_patron_celdas(config.get("patron2_celdas", ""))
+    nombre1 = config.get("nombre_patron1", "").strip()
+    nombre2 = config.get("nombre_patron2", "").strip()
+
+    registro = registro_secuencia_multisecuencia(
+        1,
+        "detectar",
+        secuencia_llamados,
+        patron1,
+        patron2,
+        nombre1,
+        nombre2,
+        resumen,
+    )
+    return pdf_path, nombre_base, secuencia_cartones, registro
+
+
+def iniciar_multisecuencia_desde_form(form):
+    """Arranca el flujo multisecuencia con la secuencia 1 (dirigido opcional)."""
+    total_secuencias = validar_total_secuencias_multisecuencia(
+        form.get("multisecuencia_total")
+    )
+    total_cartones = int(form.get("total_cartones", 6))
+    if total_cartones < 1:
+        raise ValueError("Debes generar al menos 1 cartón.")
+
+    usar_dirigido = form.get("multisecuencia_dirigido") == "on"
+    if usar_dirigido:
+        pdf_path, nombre_base, cartones, registro = (
+            _ejecutar_secuencia1_multisecuencia_dirigido(form, total_cartones)
+        )
+    else:
+        pdf_path, nombre_base, cartones, registro = (
+            _ejecutar_secuencia1_multisecuencia_detectar(form, total_cartones)
+        )
+
+    sesion = {
+        "tipo": "multisecuencia",
+        "total_secuencias": total_secuencias,
+        "secuencias_completadas": 1,
+        "fase": "resultados",
+        "cartones": serializar_cartones_para_sesion(cartones),
+        "secuencias": [registro],
+    }
+    return publicar_multisecuencia(pdf_path, nombre_base, sesion)
+
+
+def nombre_base_multisecuencia(token):
+    """Obtiene el nombre base del PDF desde la sesión multisecuencia."""
+    sesion = cargar_sesion_multisecuencia(token)
+    return sesion.get("nombre_base", NOMBRE_BASE_DEFAULT) if sesion else NOMBRE_BASE_DEFAULT
+
+
+def generar_pdf_resumen_multisecuencia(token, sesion):
+    """
+    PDF informativo con todas las secuencias, patrones y ganadores.
+    No incluye los cartones; es un informe para consulta rápida.
+    """
+    nombre_base = sesion.get("nombre_base", NOMBRE_BASE_DEFAULT)
+    pdf = FPDF("P", "mm", "A4")
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, f"Resumen multisecuencia - {nombre_base}", ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(
+        0,
+        8,
+        f"Total de secuencias: {sesion.get('total_secuencias', 0)} | "
+        f"Cartones en el PDF: {len(sesion.get('cartones', []))}",
+        ln=True,
+    )
+    pdf.ln(4)
+
+    for entrada in sesion.get("secuencias", []):
+        numero = entrada.get("numero", "?")
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 9, f"Secuencia {numero}", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        tipo = entrada.get("tipo_generacion", "detectar")
+        pdf.cell(
+            0,
+            6,
+            f"Generacion sec. 1: {'Dirigido' if tipo == 'dirigido' else 'Detectar / al azar'}"
+            if numero == 1
+            else "Analisis: detectar ganadores (mismo PDF de cartones)",
+            ln=True,
+        )
+        patrones = entrada.get("patrones", {})
+        if patrones.get("nombre_patron2"):
+            pdf.cell(0, 6, f"Patron 1: {patrones.get('nombre_patron2', '')}", ln=True)
+        if patrones.get("nombre_patron1"):
+            pdf.cell(0, 6, f"Patron 2: {patrones.get('nombre_patron1', '')}", ln=True)
+        pdf.cell(0, 6, f"Carton lleno: siempre evaluado", ln=True)
+
+        resumen = entrada.get("resumen", {})
+        pdf.cell(0, 6, f"Bolas (75): {resumen.get('secuencia_texto', '')[:120]}...", ln=True)
+        pdf.ln(2)
+
+        if entrada.get("verificacion_dirigida"):
+            ver = entrada["verificacion_dirigida"]
+            estado = "OK" if ver.get("todos_ok") else "REVISAR"
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(0, 6, f"Verificacion dirigida: {estado}", ln=True)
+            pdf.set_font("Helvetica", "", 9)
+            for item in ver.get("detalle", []):
+                if item.get("ok"):
+                    linea = (
+                        f"  Carton {item['carton']}: {item['nombre_patron']} "
+                        f"bola {item['bola_esperada']} (verificado)"
+                    )
+                else:
+                    linea = (
+                        f"  Carton {item['carton']}: esperado {item['nombre_patron']} "
+                        f"bola {item['bola_esperada']}"
+                    )
+                    if item.get("bola_real"):
+                        linea += f", simulacion bola {item['bola_real']}"
+                pdf.multi_cell(0, 5, linea)
+
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(0, 7, "Ganadores:", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        for patron in resumen.get("patrones", []):
+            if patron.get("tiene_ganador"):
+                cartones_txt = ", ".join(
+                    f"Carton {c}" for c in patron.get("cartones", [])
+                )
+                pdf.multi_cell(
+                    0,
+                    5,
+                    f"  {patron.get('nombre', '')}: {patron.get('bola_etiqueta', '')} "
+                    f"(bola {patron.get('bola_posicion', '')}) - {cartones_txt}",
+                )
+            else:
+                pdf.multi_cell(
+                    0, 5, f"  {patron.get('nombre', '')}: sin ganador"
+                )
+        pdf.ln(6)
+
+    ruta = ruta_resumen_multisecuencia(token)
+    pdf.output(ruta)
+    return ruta
+
+
 def publicar_pdf_temporal(ruta_origen, nombre_base, resumen, regenerar=None):
     token = secrets.token_urlsafe(16)
     destino = ruta_pdf_token(token)
@@ -2340,7 +2685,7 @@ def _ejecutar_modo_detectar(config):
 
     resumen["total_cartones"] = total_generados
     resumen["secuencia_texto"] = ", ".join(str(n) for n in secuencia_llamados)
-    return pdf_path, nombre_base, resumen
+    return pdf_path, nombre_base, resumen, secuencia_cartones
 
 
 def _form_a_dict():
@@ -2360,6 +2705,8 @@ def _form_a_dict():
         "patron2_celdas": request.form.get("patron2_celdas", ""),
         "detectar_ganadores_checked": request.form.get("detectar-ganadores") == "on",
         "nombre_archivo": request.form.get("nombre_archivo", ""),
+        "multisecuencia_total": request.form.get("multisecuencia_total", "2"),
+        "multisecuencia_dirigido": request.form.get("multisecuencia_dirigido") == "on",
     }
 
 
@@ -2385,6 +2732,25 @@ def index():
             )
 
         secuencia_cartones = None
+
+        if modo_operacion == "multisecuencia":
+            try:
+                token = iniciar_multisecuencia_desde_form(request.form)
+                return redirect(url_for("multisecuencia_paso", token=token))
+            except ValueError as error:
+                return render_template(
+                    "index.html",
+                    error=str(error),
+                    form=_form_a_dict(),
+                )
+            except Exception as error:
+                return render_template(
+                    "index.html",
+                    error=(
+                        "Error al iniciar multisecuencia. Detalle: " + str(error)
+                    ),
+                    form=_form_a_dict(),
+                )
 
         if modo_operacion == "dirigido":
             try:
@@ -2473,7 +2839,7 @@ def index():
 
         if detectar_ganadores_modo:
             try:
-                pdf_path, nombre_base, resumen = _ejecutar_modo_detectar(
+                pdf_path, nombre_base, resumen, _ = _ejecutar_modo_detectar(
                     _config_regenerar_detectar(request.form)
                 )
                 token = publicar_pdf_temporal(
@@ -2717,7 +3083,7 @@ def regenerar(token):
         )
 
     try:
-        pdf_path, nombre_base, resumen = _ejecutar_modo_detectar(config)
+        pdf_path, nombre_base, resumen, _ = _ejecutar_modo_detectar(config)
         nuevo_token = publicar_pdf_temporal(
             pdf_path, nombre_base, resumen, regenerar=config
         )
@@ -2734,7 +3100,18 @@ def descargar(token):
     token = token_seguro(token)
     ruta_pdf = ruta_pdf_token(token)
     datos = cargar_sesion_resultados(token)
-    if not os.path.isfile(ruta_pdf) or not datos:
+    nombre_base = NOMBRE_BASE_DEFAULT
+    if datos:
+        nombre_base = datos["nombre_base"]
+    else:
+        sesion_ms = cargar_sesion_multisecuencia(token)
+        if not sesion_ms:
+            return render_template(
+                "index.html",
+                error="El PDF ya no está disponible. Genera los cartones de nuevo.",
+            )
+        nombre_base = sesion_ms.get("nombre_base", NOMBRE_BASE_DEFAULT)
+    if not os.path.isfile(ruta_pdf):
         return render_template(
             "index.html",
             error="El PDF ya no está disponible. Genera los cartones de nuevo.",
@@ -2742,7 +3119,128 @@ def descargar(token):
     return send_file(
         ruta_pdf,
         as_attachment=True,
-        download_name=f"{datos['nombre_base']}.pdf",
+        download_name=f"{nombre_base}.pdf",
+    )
+
+
+@app.route("/multisecuencia/<token>", methods=["GET", "POST"])
+def multisecuencia_paso(token):
+    """Pantalla de cada secuencia: resultados, formulario o cierre final."""
+    token = token_seguro(token)
+    sesion = cargar_sesion_multisecuencia(token)
+    if not sesion:
+        return render_template(
+            "index.html",
+            error="La sesión multisecuencia expiró. Empieza de nuevo.",
+        )
+
+    nombre_base = sesion.get("nombre_base", NOMBRE_BASE_DEFAULT)
+    total = sesion.get("total_secuencias", 1)
+    completadas = sesion.get("secuencias_completadas", 0)
+
+    if request.method == "POST":
+        accion = request.form.get("accion", "")
+        try:
+            if accion == "continuar":
+                if completadas >= total:
+                    sesion["fase"] = "final"
+                else:
+                    sesion["fase"] = "formulario"
+                guardar_sesion_multisecuencia(token, sesion)
+                return redirect(url_for("multisecuencia_paso", token=token))
+
+            if accion == "analizar":
+                proxima = completadas + 1
+                secuencia_texto = request.form.get("secuencia_numeros", "")
+                patron1 = parsear_patron_celdas(request.form.get("patron1_celdas", ""))
+                patron2 = parsear_patron_celdas(request.form.get("patron2_celdas", ""))
+                nombre1 = request.form.get("nombre_patron1", "").strip()
+                nombre2 = request.form.get("nombre_patron2", "").strip()
+
+                cartones = deserializar_cartones_desde_sesion(sesion["cartones"])
+                secuencia_llamados, resumen = analizar_secuencia_sobre_cartones(
+                    cartones,
+                    secuencia_texto,
+                    patron1,
+                    nombre1,
+                    patron2,
+                    nombre2,
+                )
+                registro = registro_secuencia_multisecuencia(
+                    proxima,
+                    "detectar",
+                    secuencia_llamados,
+                    patron1,
+                    patron2,
+                    nombre1,
+                    nombre2,
+                    resumen,
+                )
+                sesion["secuencias"].append(registro)
+                sesion["secuencias_completadas"] = proxima
+                sesion["fase"] = "final" if proxima >= total else "resultados"
+                guardar_sesion_multisecuencia(token, sesion)
+                return redirect(url_for("multisecuencia_paso", token=token))
+
+        except ValueError as error:
+            return render_template(
+                "multisecuencia.html",
+                token=token,
+                sesion=sesion,
+                nombre_base=nombre_base,
+                error=str(error),
+                entrada_actual=sesion["secuencias"][-1] if sesion.get("secuencias") else None,
+                proxima_secuencia=completadas + 1,
+            )
+
+    entrada_actual = sesion["secuencias"][-1] if sesion.get("secuencias") else None
+    proxima_secuencia = completadas + 1
+    return render_template(
+        "multisecuencia.html",
+        token=token,
+        sesion=sesion,
+        nombre_base=nombre_base,
+        error=None,
+        entrada_actual=entrada_actual,
+        proxima_secuencia=proxima_secuencia,
+    )
+
+
+@app.route("/multisecuencia/<token>/empezar-cero", methods=["POST"])
+def multisecuencia_empezar_cero(token):
+    """Reinicia todo el flujo multisecuencia."""
+    token = token_seguro(token)
+    for ruta in (
+        ruta_meta_multisecuencia(token),
+        ruta_pdf_token(token),
+        ruta_resumen_multisecuencia(token),
+    ):
+        if os.path.isfile(ruta):
+            try:
+                os.remove(ruta)
+            except OSError:
+                pass
+    return redirect(url_for("index"))
+
+
+@app.route("/multisecuencia/<token>/resumen.pdf")
+def multisecuencia_resumen_pdf(token):
+    """Descarga el PDF resumen de todas las secuencias."""
+    token = token_seguro(token)
+    sesion = cargar_sesion_multisecuencia(token)
+    if not sesion or sesion.get("fase") != "final":
+        return render_template(
+            "index.html",
+            error="El resumen no está disponible hasta completar todas las secuencias.",
+        )
+    ruta = ruta_resumen_multisecuencia(token)
+    if not os.path.isfile(ruta):
+        generar_pdf_resumen_multisecuencia(token, sesion)
+    nombre_base = sesion.get("nombre_base", NOMBRE_BASE_DEFAULT)
+    return send_file(
+        ruta,
+        as_attachment=True,
+        download_name=f"{nombre_base}_resumen_secuencias.pdf",
     )
 
 

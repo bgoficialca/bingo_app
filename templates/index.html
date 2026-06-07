@@ -38,6 +38,11 @@
                                 {% if modo == 'dirigido' %}checked{% endif %}>
                             Modo dirigido
                         </label>
+                        <label class="radio-linea">
+                            <input type="radio" name="modo_operacion" value="multisecuencia"
+                                {% if modo == 'multisecuencia' %}checked{% endif %}>
+                            Multisecuencia
+                        </label>
                         </div>
                     </fieldset>
 
@@ -98,6 +103,37 @@
                         <p class="ayuda">Secuencia cantada (números separados por coma):</p>
                         <textarea name="secuencia_numeros" id="secuencia_numeros" class="textarea-secuencia"
                             placeholder="1, 2, 3, 35, 42, 71...">{{ form.secuencia_numeros if form else '' }}</textarea>
+                    </div>
+
+                    <div id="opciones-multisecuencia" class="opciones-ganadores">
+                        <h3>Multisecuencia</h3>
+                        <section class="reglas-dirigido">
+                            <p class="ayuda">Un solo PDF de cartones para varias partidas. La <strong>secuencia 1</strong> genera el PDF; las siguientes usan los mismos cartones con otras bolas y patrones.</p>
+                        </section>
+
+                        <label for="multisecuencia_total">¿Cuántas secuencias usarás?</label>
+                        <select name="multisecuencia_total" id="multisecuencia_total">
+                            {% set mst = form.multisecuencia_total if form else '2' %}
+                            {% for n in range(1, 11) %}
+                            <option value="{{ n }}" {% if mst == n|string %}selected{% endif %}>{{ n }} secuencia{% if n > 1 %}s{% endif %}</option>
+                            {% endfor %}
+                        </select>
+
+                        <label class="check-linea ms-check-dirigido">
+                            <input type="checkbox" name="multisecuencia_dirigido" id="multisecuencia_dirigido"
+                                value="on" {% if form and form.multisecuencia_dirigido %}checked{% endif %}>
+                            Usar modo dirigido en la secuencia 1 (opcional)
+                        </label>
+                        <p class="ayuda" id="ms-ayuda-seq1">Sin marcar: cartones al azar + detectar como en la secuencia 1.</p>
+
+                        <div id="ms-panel-dirigido" class="ms-subpanel" hidden>
+                            <p class="ayuda paso-dirigido"><strong>Secuencia 1 — modo dirigido</strong></p>
+                        </div>
+                        <div id="ms-panel-detectar" class="ms-subpanel">
+                            <p class="ayuda"><strong>Secuencia 1 — detectar</strong> (75 bolas):</p>
+                            <textarea name="secuencia_numeros" id="secuencia_numeros_ms" class="textarea-secuencia"
+                                placeholder="1, 2, 3, ... (75 números)">{{ form.secuencia_numeros if form else '' }}</textarea>
+                        </div>
                     </div>
 
                     <div id="opciones-dirigido" class="opciones-ganadores">
@@ -780,20 +816,52 @@
             document.getElementById('nombre_patron2').value = document.getElementById('nombre_patron2_detectar').value;
         }
 
+        function actualizarPanelMultisecuencia() {
+            const panelMs = document.getElementById('opciones-multisecuencia');
+            const checkDirigido = document.getElementById('multisecuencia_dirigido');
+            const panelDirigido = document.getElementById('opciones-dirigido');
+            const panelPatrones = document.getElementById('opciones-patrones');
+            const panelDetectar = document.getElementById('opciones-ganadores');
+            const msDetectar = document.getElementById('ms-panel-detectar');
+            const btn = document.getElementById('btn-generar');
+            if (modoSeleccionado() !== 'multisecuencia') return;
+
+            const usarDirigido = checkDirigido && checkDirigido.checked;
+            panelDirigido.classList.toggle('visible', usarDirigido);
+            panelPatrones.classList.toggle('visible', !usarDirigido);
+            panelDetectar.classList.remove('visible');
+            if (msDetectar) msDetectar.hidden = usarDirigido;
+
+            if (usarDirigido) {
+                actualizarBotonGenerarDirigido();
+                btn.textContent = 'Iniciar multisecuencia (secuencia 1 dirigida)';
+            } else {
+                btn.textContent = 'Iniciar multisecuencia (secuencia 1)';
+                btn.disabled = false;
+                crearCuadriculaPatronDetectar('grid-patron1-detectar', 'patron1_celdas');
+                crearCuadriculaPatronDetectar('grid-patron2-detectar', 'patron2_celdas');
+                sincronizarPatronesDetectar();
+            }
+        }
+
         function toggleModos() {
             const modo = modoSeleccionado();
             const panelDetectar = document.getElementById('opciones-ganadores');
             const panelDirigido = document.getElementById('opciones-dirigido');
+            const panelMultisecuencia = document.getElementById('opciones-multisecuencia');
             const panelPatrones = document.getElementById('opciones-patrones');
             const btn = document.getElementById('btn-generar');
             const hiddenDetectar = document.getElementById('detectar-ganadores-hidden');
 
+            panelMultisecuencia.classList.toggle('visible', modo === 'multisecuencia');
             panelDetectar.classList.toggle('visible', modo === 'detectar');
             panelDirigido.classList.toggle('visible', modo === 'dirigido');
             panelPatrones.classList.toggle('visible', modo === 'detectar');
             hiddenDetectar.value = modo === 'detectar' ? 'on' : '';
 
-            if (modo === 'detectar') {
+            if (modo === 'multisecuencia') {
+                actualizarPanelMultisecuencia();
+            } else if (modo === 'detectar') {
                 btn.textContent = 'Generar y ver ganadores';
                 btn.disabled = false;
                 crearCuadriculaPatronDetectar('grid-patron1-detectar', 'patron1_celdas');
@@ -861,13 +929,45 @@
             if (modoSeleccionado() === 'dirigido') {
                 reiniciarAsistenteDirigido(true);
             }
+            if (modoSeleccionado() === 'multisecuencia' &&
+                document.getElementById('multisecuencia_dirigido').checked) {
+                reiniciarAsistenteDirigido(true);
+            }
         });
 
         document.getElementById('nombre_patron1_detectar').addEventListener('input', sincronizarPatronesDetectar);
         document.getElementById('nombre_patron2_detectar').addEventListener('input', sincronizarPatronesDetectar);
 
+        document.getElementById('multisecuencia_dirigido')?.addEventListener('change', () => {
+            if (modoSeleccionado() === 'multisecuencia') {
+                if (document.getElementById('multisecuencia_dirigido').checked) {
+                    reiniciarAsistenteDirigido(true);
+                    crearCuadriculaPatron('grid-patron1', 'patron1_celdas');
+                    crearCuadriculaPatron('grid-patron2', 'patron2_celdas');
+                }
+                actualizarPanelMultisecuencia();
+            }
+        });
+
         document.getElementById('form-bingo').addEventListener('submit', (e) => {
-            if (modoSeleccionado() === 'dirigido') {
+            if (modoSeleccionado() === 'multisecuencia') {
+                const usarDirigido = document.getElementById('multisecuencia_dirigido').checked;
+                if (usarDirigido) {
+                    if (!asistenteDirigido.listo) {
+                        e.preventDefault();
+                        alert('Completa el asistente de la secuencia 1 antes de continuar.');
+                        return;
+                    }
+                    serializarConfigDesdeAsistente();
+                } else {
+                    sincronizarPatronesDetectar();
+                    document.getElementById('nombre_patron1').value = document.getElementById('nombre_patron1_detectar').value;
+                    document.getElementById('nombre_patron2').value = document.getElementById('nombre_patron2_detectar').value;
+                }
+                const btn = document.getElementById('btn-generar');
+                btn.disabled = true;
+                btn.textContent = 'Generando secuencia 1…';
+            } else if (modoSeleccionado() === 'dirigido') {
                 if (!asistenteDirigido.listo) {
                     e.preventDefault();
                     alert('Completa el asistente antes de generar los cartones.');
