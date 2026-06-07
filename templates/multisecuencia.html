@@ -1,3 +1,4 @@
+{% from '_macro_patrones.html' import tarjetas_ganadores %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='bingo.css') }}">
 </head>
 <body>
-    <div class="pagina">
+    <div class="pagina pagina-multisecuencia">
         <header class="encabezado-app encabezado-multisecuencia">
             <h1>Modo multisecuencia</h1>
             <p class="ms-indicador-secuencia">
@@ -20,24 +21,38 @@
                 de {{ sesion.total_secuencias }}
                 {% endif %}
             </p>
-            <div class="ms-barra-descarga">
-                <a href="{{ url_for('descargar', token=token) }}" class="btn-descargar btn-descargar-compacto">
-                    Descargar PDF de cartones
-                </a>
+
+            <div class="ms-barra-progreso" aria-label="Progreso de secuencias">
+                {% for n in range(1, sesion.total_secuencias + 1) %}
+                <span class="ms-paso-progreso {% if n <= sesion.secuencias_completadas %}completado{% elif n == proxima_secuencia and sesion.fase == 'formulario' %}activo{% endif %}">
+                    {{ n }}
+                </span>
+                {% if not loop.last %}<span class="ms-linea-progreso"></span>{% endif %}
+                {% endfor %}
             </div>
         </header>
 
-        <div class="tarjeta resultados-cuerpo">
-            {% if error %}
-            <div class="alerta-error" role="alert">{{ error }}</div>
-            {% endif %}
+        {% if error %}
+        <div class="alerta-error flujo-alerta-global ms-alerta-error" role="alert">{{ error }}</div>
+        {% endif %}
 
+        <div class="tarjeta resultados-cuerpo ms-cuerpo-principal">
             {% if sesion.fase == 'formulario' %}
-            <section class="ms-formulario-secuencia">
-                <h2>Secuencia {{ proxima_secuencia }}</h2>
-                <p class="ayuda">Mismos cartones del PDF. Ingresa <strong>75 bolas</strong> y los patrones para esta partida.</p>
+            <section class="ms-formulario-secuencia tarjeta-flujo">
+                <p class="flujo-etiqueta-modo">Secuencia {{ proxima_secuencia }} de {{ sesion.total_secuencias }}</p>
+                <h2 class="resumen-titulo">Analizar esta partida</h2>
+                <p class="resumen-sub">
+                    Mismos cartones del PDF <strong>{{ nombre_base }}</strong>.
+                    Ingresa <strong>75 bolas</strong> y los patrones para esta secuencia.
+                </p>
 
-                <form method="POST" action="{{ url_for('multisecuencia_paso', token=token) }}" id="form-secuencia-ms">
+                <div class="ms-aviso-pdf">
+                    <a href="{{ url_for('descargar', token=token) }}" class="btn-descargar btn-descargar-compacto">
+                        Descargar PDF de cartones
+                    </a>
+                </div>
+
+                <form method="POST" action="{{ url_for('multisecuencia_paso', token=token) }}" id="form-secuencia-ms" class="ms-form-secuencia">
                     <input type="hidden" name="accion" value="analizar">
                     <input type="hidden" name="patron1_celdas" id="patron1_celdas_ms" value="">
                     <input type="hidden" name="patron2_celdas" id="patron2_celdas_ms" value="">
@@ -46,7 +61,7 @@
                     <textarea name="secuencia_numeros" id="secuencia_numeros_ms" class="textarea-secuencia"
                         placeholder="1, 5, 12, 18, ... (75 números del 1 al 75)" required></textarea>
 
-                    <h3>Patrones de esta secuencia</h3>
+                    <h3 class="ms-subtitulo-seccion">Patrones de esta secuencia</h3>
                     <p class="ayuda">Marca las formas y ponles nombre. <strong>Cartón lleno</strong> siempre activo.</p>
 
                     <div class="patrones-detectar-grid">
@@ -72,60 +87,55 @@
                         </article>
                     </div>
 
-                    <button type="submit" class="btn-principal">Analizar secuencia {{ proxima_secuencia }}</button>
+                    <button type="submit" class="btn-principal btn-ms-analizar">
+                        Analizar secuencia {{ proxima_secuencia }}
+                    </button>
                 </form>
             </section>
 
             {% elif sesion.fase == 'final' %}
             <section class="ms-pantalla-final">
-                <h2>Resumen completo</h2>
-                <p class="ayuda">Completaste las {{ sesion.total_secuencias }} secuencias con el mismo PDF de cartones.</p>
+                <h2 class="resumen-titulo">Resumen completo</h2>
+                <p class="resumen-sub">
+                    Completaste las <strong>{{ sesion.total_secuencias }}</strong> secuencias
+                    con el mismo PDF de cartones.
+                </p>
 
                 <div class="ms-lista-resumen-secuencias">
                     {% for entrada in sesion.secuencias %}
-                    <article class="ms-tarjeta-secuencia-resumen">
-                        <h3>Secuencia {{ entrada.numero }}</h3>
-                        <p class="ayuda">
-                            {% if entrada.tipo_generacion == 'dirigido' %}
-                            Generación: modo dirigido
-                            {% else %}
-                            Análisis: detectar ganadores
-                            {% endif %}
-                        </p>
-                        {% if entrada.resumen.hay_ganadores %}
-                        <ul>
-                            {% for patron in entrada.resumen.patrones %}
-                            {% if patron.tiene_ganador %}
-                            <li>
-                                <strong>{{ patron.nombre }}</strong> — {{ patron.bola_etiqueta }}
-                                (cartones: {% for c in patron.cartones %}{{ c }}{% if not loop.last %}, {% endif %}{% endfor %})
-                            </li>
-                            {% endif %}
-                            {% endfor %}
-                        </ul>
-                        {% else %}
-                        <p>Sin ganadores en esta secuencia.</p>
-                        {% endif %}
+                    <article class="ms-bloque-secuencia">
+                        <header class="ms-encabezado-secuencia">
+                            <h3>Secuencia {{ entrada.numero }}</h3>
+                            <span class="ms-etiqueta-tipo">
+                                {% if entrada.tipo_generacion == 'dirigido' %}
+                                Modo dirigido
+                                {% else %}
+                                Detectar ganadores
+                                {% endif %}
+                            </span>
+                        </header>
+                        {{ tarjetas_ganadores(entrada.resumen) }}
                     </article>
                     {% endfor %}
                 </div>
 
                 <div class="zona-descarga ms-zona-final">
+                    <p>Descargas disponibles</p>
                     <a href="{{ url_for('descargar', token=token) }}" class="btn-descargar">
-                        Descargar PDF de cartones ({{ nombre_base }}.pdf)
+                        PDF de cartones ({{ nombre_base }}.pdf)
                     </a>
                     <a href="{{ url_for('multisecuencia_resumen_pdf', token=token) }}" class="btn-descargar btn-resumen-ms">
-                        Descargar PDF resumen de todas las secuencias
+                        PDF resumen de todas las secuencias
                     </a>
                     <form action="{{ url_for('multisecuencia_empezar_cero', token=token) }}" method="POST" class="form-empezar-cero">
                         <button type="submit" class="btn-regenerar">Empezar de cero</button>
-                        <p class="ayuda-regenerar">Descarta esta sesión y vuelve al inicio si no te gustó el PDF o los resultados.</p>
+                        <p class="ayuda-regenerar">Descarta esta sesión si quieres configurar otra partida desde cero.</p>
                     </form>
                 </div>
 
                 <div class="zona-fin-proceso">
                     <a href="{{ url_for('index') }}" class="btn-ir-principio">← Ir al principio</a>
-                    <p class="ayuda ayuda-fin-proceso">Terminaste todas las secuencias. Vuelve al inicio para otra partida.</p>
+                    <p class="ayuda ayuda-fin-proceso">Vuelve al menú para otra partida.</p>
                 </div>
             </section>
 
@@ -140,7 +150,7 @@
             </h2>
             <p class="resumen-sub">
                 <strong>{{ resumen.total_cartones }}</strong> cartones en el PDF.
-                Secuencia: {{ resumen.secuencia_texto[:80] }}{% if resumen.secuencia_texto|length > 80 %}…{% endif %}
+                Secuencia analizada: {{ resumen.secuencia_texto }}
             </p>
 
             {% if entrada_actual.verificacion_dirigida %}
@@ -158,9 +168,9 @@
                     <li class="{% if item.ok %}item-ok{% else %}item-fallo{% endif %}">
                         Cartón <strong>{{ item.carton }}</strong>:
                         {% if item.ok %}
-                        {{ item.nombre_patron }} en bola {{ item.bola_esperada }} (verificado).
+                        ganó <strong>{{ item.nombre_patron }}</strong> en la bola {{ item.bola_esperada }} (verificado).
                         {% else %}
-                        esperado {{ item.nombre_patron }} en bola {{ item.bola_esperada }}.
+                        se esperaba <strong>{{ item.nombre_patron }}</strong> en la bola {{ item.bola_esperada }}.
                         {% endif %}
                     </li>
                     {% endfor %}
@@ -168,43 +178,29 @@
             </section>
             {% endif %}
 
-            {% if resumen.hay_ganadores %}
-            <div class="lista-patrones">
-                {% for patron in resumen.patrones %}
-                <article class="tarjeta-patron {% if patron.tiene_ganador %}gano{% else %}no-gano{% endif %}">
-                    <h3 class="nombre-patron">{{ patron.nombre }}</h3>
-                    {% if patron.tiene_ganador %}
-                    <div class="bola-destacada">{{ patron.bola_etiqueta }}</div>
-                    <p class="cartones-ganadores">
-                        {% for c in patron.cartones %}
-                        <strong>Cartón {{ c }}</strong>{% if not loop.last %}, {% endif %}
-                        {% endfor %}
-                    </p>
-                    <p style="margin:8px 0 0; font-size:0.85rem; color:#555;">
-                        Bola {{ patron.bola_posicion }} en la secuencia
-                    </p>
-                    {% else %}
-                    <p class="cartones-ganadores" style="color:#666;">Nadie ganó este patrón.</p>
-                    {% endif %}
-                </article>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="sin-ganadores-global">No hubo ganadores en esta secuencia.</div>
-            {% endif %}
+            {{ tarjetas_ganadores(resumen) }}
 
-            <div class="ms-acciones-siguiente">
+            <div class="zona-descarga">
+                <p>¿Deseas descargar el PDF de los cartones?</p>
+                <a href="{{ url_for('descargar', token=token) }}" class="btn-descargar">
+                    Sí, descargar {{ nombre_base }}.pdf
+                </a>
+            </div>
+
+            <div class="ms-acciones-siguiente flujo-acciones-paso">
                 {% if sesion.secuencias_completadas < sesion.total_secuencias %}
                 <form method="POST" action="{{ url_for('multisecuencia_paso', token=token) }}">
                     <input type="hidden" name="accion" value="continuar">
-                    <button type="submit" class="btn-principal">
-                        Continuar a secuencia {{ proxima_secuencia }}
+                    <button type="submit" class="btn-flujo-principal btn-ms-siguiente">
+                        Continuar a secuencia {{ proxima_secuencia }} →
                     </button>
                 </form>
                 {% else %}
                 <form method="POST" action="{{ url_for('multisecuencia_paso', token=token) }}">
                     <input type="hidden" name="accion" value="continuar">
-                    <button type="submit" class="btn-principal">Ver resumen final</button>
+                    <button type="submit" class="btn-flujo-principal btn-ms-siguiente">
+                        Ver resumen final →
+                    </button>
                 </form>
                 {% endif %}
             </div>

@@ -1,3 +1,4 @@
+{% from '_macro_patrones.html' import tarjetas_ganadores %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -49,41 +50,7 @@
             </section>
             {% endif %}
 
-            {% if resumen.hay_ganadores %}
-            <div class="lista-patrones">
-                {% for patron in resumen.patrones %}
-                <article class="tarjeta-patron {% if patron.tiene_ganador %}gano{% else %}no-gano{% endif %}">
-                    <h3 class="nombre-patron">{{ patron.nombre }}</h3>
-
-                    {% if patron.tiene_ganador %}
-                    <p style="margin:0 0 6px; font-size:0.95rem;">Bola ganadora:</p>
-                    <div class="bola-destacada">{{ patron.bola_etiqueta }}</div>
-                    <p class="cartones-ganadores">
-                        {% if patron.un_carton %}
-                        Ganador: <strong>Cartón {{ patron.cartones[0] }}</strong>
-                        {% else %}
-                        Ganadores:
-                        {% for c in patron.cartones %}
-                        <strong>Cartón {{ c }}</strong>{% if not loop.last %}, {% endif %}
-                        {% endfor %}
-                        {% endif %}
-                    </p>
-                    <p style="margin:8px 0 0; font-size:0.85rem; color:#555;">
-                        (Posición {{ patron.bola_posicion }} en tu secuencia)
-                    </p>
-                    {% else %}
-                    <p class="cartones-ganadores" style="color:#666;">
-                        Nadie ganó con esta forma en la secuencia indicada.
-                    </p>
-                    {% endif %}
-                </article>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="sin-ganadores-global">
-                No hubo ganadores con la secuencia y patrones configurados.
-            </div>
-            {% endif %}
+            {{ tarjetas_ganadores(resumen) }}
 
             <div class="zona-descarga">
                 <p>¿Deseas descargar el PDF de los cartones?</p>

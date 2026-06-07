@@ -110,7 +110,32 @@ def validar_y_guardar_imagen_subida(archivo, etiqueta):
     nombre_seguro = f"custom_{etiqueta}_{secrets.token_hex(8)}{extension}"
     ruta_destino = os.path.join(carpeta_para_guardar(), nombre_seguro)
     archivo.save(ruta_destino)
-    return ruta_destino
+    return normalizar_imagen_para_pdf(ruta_destino)
+
+
+def normalizar_imagen_para_pdf(ruta):
+    """Asegura PNG/JPEG válidos para FPDF (WEBP/GIF se convierten si hay Pillow)."""
+    extension = os.path.splitext(ruta)[1].lower()
+    if extension in (".png", ".jpg", ".jpeg"):
+        return ruta
+    try:
+        from PIL import Image
+    except ImportError:
+        raise ValueError(
+            "Para imágenes WEBP o GIF instala soporte adicional o usa PNG/JPG."
+        )
+    imagen = Image.open(ruta)
+    if imagen.mode in ("RGBA", "P", "LA"):
+        fondo = Image.new("RGB", imagen.size, (255, 255, 255))
+        if imagen.mode == "P":
+            imagen = imagen.convert("RGBA")
+        fondo.paste(imagen, mask=imagen.split()[-1] if imagen.mode == "RGBA" else None)
+        imagen = fondo
+    else:
+        imagen = imagen.convert("RGB")
+    ruta_png = os.path.splitext(ruta)[0] + "_pdf.png"
+    imagen.save(ruta_png, "PNG")
+    return ruta_png
 
 
 def resolver_recursos_generacion(version, logo_custom=None, fondo_custom=None):
@@ -455,6 +480,13 @@ def nombre_base_multisecuencia(token):
     return sesion.get("nombre_base", NOMBRE_BASE_DEFAULT) if sesion else NOMBRE_BASE_DEFAULT
 
 
+def _pdf_texto_ancho(pdf, texto, altura=5, fuente=("Helvetica", "", 10)):
+    """Escribe un párrafo usando todo el ancho útil (evita error de fpdf2 con ancho 0)."""
+    pdf.set_font(*fuente)
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(pdf.epw, altura, texto)
+
+
 def generar_pdf_resumen_multisecuencia(token, sesion):
     """
     PDF informativo con todas las secuencias, patrones y ganadores.
@@ -464,81 +496,84 @@ def generar_pdf_resumen_multisecuencia(token, sesion):
     pdf = FPDF("P", "mm", "A4")
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, f"Resumen multisecuencia - {nombre_base}", ln=True)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(
-        0,
-        8,
+    _pdf_texto_ancho(pdf, f"Resumen multisecuencia - {nombre_base}", altura=10, fuente=("Helvetica", "B", 16))
+    _pdf_texto_ancho(
+        pdf,
         f"Total de secuencias: {sesion.get('total_secuencias', 0)} | "
         f"Cartones en el PDF: {len(sesion.get('cartones', []))}",
-        ln=True,
+        altura=8,
     )
     pdf.ln(4)
 
     for entrada in sesion.get("secuencias", []):
         numero = entrada.get("numero", "?")
-        pdf.set_font("Helvetica", "B", 13)
-        pdf.cell(0, 9, f"Secuencia {numero}", ln=True)
-        pdf.set_font("Helvetica", "", 10)
+        _pdf_texto_ancho(pdf, f"Secuencia {numero}", altura=9, fuente=("Helvetica", "B", 13))
         tipo = entrada.get("tipo_generacion", "detectar")
-        pdf.cell(
-            0,
-            6,
-            f"Generacion sec. 1: {'Dirigido' if tipo == 'dirigido' else 'Detectar / al azar'}"
-            if numero == 1
-            else "Analisis: detectar ganadores (mismo PDF de cartones)",
-            ln=True,
-        )
+        if numero == 1:
+            tipo_txt = (
+                "Generacion sec. 1: Dirigido"
+                if tipo == "dirigido"
+                else "Generacion sec. 1: Detectar / al azar"
+            )
+        else:
+            tipo_txt = "Analisis: detectar ganadores (mismo PDF de cartones)"
+        _pdf_texto_ancho(pdf, tipo_txt, altura=6)
+
         patrones = entrada.get("patrones", {})
         if patrones.get("nombre_patron2"):
-            pdf.cell(0, 6, f"Patron 1: {patrones.get('nombre_patron2', '')}", ln=True)
+            _pdf_texto_ancho(pdf, f"Patron 1: {patrones.get('nombre_patron2', '')}", altura=6)
         if patrones.get("nombre_patron1"):
-            pdf.cell(0, 6, f"Patron 2: {patrones.get('nombre_patron1', '')}", ln=True)
-        pdf.cell(0, 6, f"Carton lleno: siempre evaluado", ln=True)
+            _pdf_texto_ancho(pdf, f"Patron 2: {patrones.get('nombre_patron1', '')}", altura=6)
+        _pdf_texto_ancho(pdf, "Carton lleno: siempre evaluado", altura=6)
 
         resumen = entrada.get("resumen", {})
-        pdf.cell(0, 6, f"Bolas (75): {resumen.get('secuencia_texto', '')[:120]}...", ln=True)
+        bolas = resumen.get("secuencia_texto", "")
+        if len(bolas) > 120:
+            bolas = bolas[:120] + "..."
+        _pdf_texto_ancho(pdf, f"Bolas (75): {bolas}", altura=6)
         pdf.ln(2)
 
         if entrada.get("verificacion_dirigida"):
             ver = entrada["verificacion_dirigida"]
             estado = "OK" if ver.get("todos_ok") else "REVISAR"
-            pdf.set_font("Helvetica", "B", 10)
-            pdf.cell(0, 6, f"Verificacion dirigida: {estado}", ln=True)
-            pdf.set_font("Helvetica", "", 9)
+            _pdf_texto_ancho(
+                pdf,
+                f"Verificacion dirigida: {estado}",
+                altura=6,
+                fuente=("Helvetica", "B", 10),
+            )
             for item in ver.get("detalle", []):
                 if item.get("ok"):
                     linea = (
-                        f"  Carton {item['carton']}: {item['nombre_patron']} "
+                        f"Carton {item['carton']}: {item['nombre_patron']} "
                         f"bola {item['bola_esperada']} (verificado)"
                     )
                 else:
                     linea = (
-                        f"  Carton {item['carton']}: esperado {item['nombre_patron']} "
+                        f"Carton {item['carton']}: esperado {item['nombre_patron']} "
                         f"bola {item['bola_esperada']}"
                     )
                     if item.get("bola_real"):
                         linea += f", simulacion bola {item['bola_real']}"
-                pdf.multi_cell(0, 5, linea)
+                _pdf_texto_ancho(pdf, linea, altura=5, fuente=("Helvetica", "", 9))
 
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(0, 7, "Ganadores:", ln=True)
-        pdf.set_font("Helvetica", "", 10)
+        _pdf_texto_ancho(pdf, "Ganadores:", altura=7, fuente=("Helvetica", "B", 10))
         for patron in resumen.get("patrones", []):
             if patron.get("tiene_ganador"):
                 cartones_txt = ", ".join(
                     f"Carton {c}" for c in patron.get("cartones", [])
                 )
-                pdf.multi_cell(
-                    0,
-                    5,
-                    f"  {patron.get('nombre', '')}: {patron.get('bola_etiqueta', '')} "
+                _pdf_texto_ancho(
+                    pdf,
+                    f"{patron.get('nombre', '')}: {patron.get('bola_etiqueta', '')} "
                     f"(bola {patron.get('bola_posicion', '')}) - {cartones_txt}",
+                    altura=5,
                 )
             else:
-                pdf.multi_cell(
-                    0, 5, f"  {patron.get('nombre', '')}: sin ganador"
+                _pdf_texto_ancho(
+                    pdf,
+                    f"{patron.get('nombre', '')}: sin ganador",
+                    altura=5,
                 )
         pdf.ln(6)
 
@@ -3292,10 +3327,19 @@ def multisecuencia_resumen_pdf(token):
             "index.html",
             error="El resumen no está disponible hasta completar todas las secuencias.",
         )
-    ruta = ruta_resumen_multisecuencia(token)
-    if not os.path.isfile(ruta):
-        generar_pdf_resumen_multisecuencia(token, sesion)
     nombre_base = sesion.get("nombre_base", NOMBRE_BASE_DEFAULT)
+    try:
+        ruta = generar_pdf_resumen_multisecuencia(token, sesion)
+    except Exception as error:
+        return render_template(
+            "multisecuencia.html",
+            token=token,
+            sesion=sesion,
+            nombre_base=nombre_base,
+            error=f"No se pudo generar el PDF resumen: {error}",
+            entrada_actual=None,
+            proxima_secuencia=sesion.get("secuencias_completadas", 0) + 1,
+        )
     return send_file(
         ruta,
         as_attachment=True,

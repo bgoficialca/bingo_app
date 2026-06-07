@@ -1089,10 +1089,158 @@ body {
 }
 
 /* --- Modo multisecuencia --- */
+.pagina-multisecuencia {
+    max-width: 900px;
+}
+
 .encabezado-multisecuencia .ms-indicador-secuencia {
     margin: 8px 0 12px;
     font-size: 1.05rem;
     color: #333;
+}
+
+.ms-barra-progreso {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 12px 0 4px;
+    padding: 10px;
+    background: var(--tarjeta);
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.ms-paso-progreso {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    background: #e8e8e8;
+    color: #666;
+}
+
+.ms-paso-progreso.completado {
+    background: var(--ok);
+    color: #fff;
+}
+
+.ms-paso-progreso.activo {
+    background: var(--naranja);
+    color: #fff;
+}
+
+.ms-linea-progreso {
+    width: 20px;
+    height: 2px;
+    background: #ddd;
+}
+
+.ms-alerta-error {
+    margin-bottom: 12px;
+}
+
+.ms-cuerpo-principal {
+    padding: 20px;
+}
+
+.ms-formulario-secuencia {
+    padding: 20px;
+}
+
+.ms-form-secuencia label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--texto);
+}
+
+.ms-form-secuencia .textarea-secuencia,
+.ms-form-secuencia input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.ms-subtitulo-seccion {
+    margin: 18px 0 8px;
+    color: var(--naranja);
+}
+
+.ms-aviso-pdf {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.btn-ms-analizar {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.ms-bloque-secuencia {
+    padding: 16px;
+    background: #fafafa;
+    border: 1px solid #e8e8e8;
+    border-radius: 14px;
+}
+
+.ms-encabezado-secuencia {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.ms-encabezado-secuencia h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.ms-etiqueta-tipo {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #fff0e8;
+    color: var(--naranja);
+}
+
+.ms-acciones-siguiente {
+    margin-top: 8px;
+    border-top: none;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+}
+
+.btn-ms-siguiente {
+    width: 100%;
+}
+
+.etiqueta-bola-ganadora {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+}
+
+.posicion-secuencia {
+    margin: 8px 0 0;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.texto-sin-ganador {
+    color: #666;
 }
 
 .ms-barra-descarga {
