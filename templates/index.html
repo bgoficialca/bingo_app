@@ -83,7 +83,7 @@
                     <h2 id="titulo-paso-config" class="flujo-titulo-paso">Configurar partida</h2>
 
                     <div id="bloque-config-normal" class="bloque-config-modo">
-                        <p class="ayuda-bloque">No necesitas más datos aquí. En el siguiente paso eliges cantidad, colores y diseño del PDF.</p>
+                        <p class="ayuda-bloque">No necesitas más datos aquí. Ya personalizaste colores y diseño; pulsa generar cuando quieras.</p>
                     </div>
 
                     <div id="opciones-ganadores" class="opciones-ganadores bloque-config-modo">
@@ -269,11 +269,11 @@
                             Si dejas <strong>Patrón 2</strong> vacío, solo se evalúan <strong>Patrón 1</strong> y cartón lleno.
                         </p>
                     </div>
+                </div>
 
-                    <div class="flujo-acciones">
-                        <button type="button" class="btn-flujo-atras" data-ir-paso="2">← Volver a personalizar</button>
-                        <button type="submit" class="btn-flujo-generar" id="btn-generar">Generar y descargar PDF</button>
-                    </div>
+                <div class="flujo-acciones flujo-acciones-final flujo-acciones-paso">
+                    <button type="submit" class="btn-flujo-generar" id="btn-generar">Generar y descargar PDF</button>
+                    <button type="button" class="btn-flujo-atras" data-ir-paso="2">← Volver a personalizar</button>
                 </div>
             </section>
 
@@ -362,11 +362,6 @@
                             </div>
                             <p class="ayuda ayuda-inline">Vacío = <strong>cartones_BG</strong></p>
                         </fieldset>
-
-                        <div class="flujo-acciones flujo-acciones-final">
-                            <button type="button" class="btn-flujo-atras" data-ir-paso="1">← Cambiar modo</button>
-                            <button type="button" class="btn-flujo-principal" id="btn-ir-configurar">Configurar partida →</button>
-                        </div>
                     </div>
 
                     <div class="tarjeta panel-preview panel-preview-flujo">
@@ -386,6 +381,11 @@
                             🔄 Otro cartón de muestra
                         </button>
                     </div>
+                </div>
+
+                <div class="flujo-acciones flujo-acciones-final flujo-acciones-paso">
+                    <button type="button" class="btn-flujo-principal" id="btn-ir-configurar">Configurar partida →</button>
+                    <button type="button" class="btn-flujo-atras" data-ir-paso="1">← Cambiar modo</button>
                 </div>
             </section>
         </form>

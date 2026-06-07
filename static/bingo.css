@@ -624,6 +624,45 @@ body {
     font-size: 0.95rem;
 }
 
+/* Bloque final: volver al inicio del asistente */
+.zona-fin-proceso {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 2px solid #eee;
+    text-align: center;
+}
+
+.btn-ir-principio {
+    display: inline-block;
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    text-align: center;
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: #fff;
+    background: var(--naranja);
+    border: none;
+    border-radius: 12px;
+    text-decoration: none;
+    box-sizing: border-box;
+    box-shadow: 0 4px 14px rgba(254, 99, 11, 0.25);
+}
+
+.btn-ir-principio:hover {
+    background: var(--naranja-oscuro);
+    color: #fff;
+}
+
+.ayuda-fin-proceso {
+    margin: 10px auto 0;
+    max-width: 360px;
+    font-size: 0.82rem;
+    color: #666;
+    line-height: 1.4;
+}
+
 .sin-ganadores-global {
     background: #fff8e6;
     border: 2px solid #ffc107;
@@ -1316,8 +1355,31 @@ body {
     flex-direction: column;
 }
 
-.flujo-acciones-final .btn-flujo-generar {
+/* Acción principal arriba; volver atrás debajo */
+.flujo-acciones-final .btn-flujo-generar,
+.flujo-acciones-final .btn-flujo-principal {
     order: -1;
+}
+
+/* Barra de acciones fuera de la columna del formulario (ancho completo del paso) */
+.flujo-acciones-paso {
+    width: 100%;
+    margin-top: 16px;
+    padding: 16px 20px;
+    background: var(--tarjeta);
+    border-radius: 16px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
+    border-top: none;
+}
+
+.flujo-acciones-paso .btn-flujo-principal,
+.flujo-acciones-paso .btn-flujo-generar {
+    width: 100%;
+}
+
+.flujo-acciones-paso .btn-flujo-atras {
+    width: 100%;
+    text-align: center;
 }
 
 .btn-flujo-principal,

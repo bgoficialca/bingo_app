@@ -99,9 +99,11 @@
                     <p class="ayuda-regenerar">Genera cartones nuevos al azar y vuelve a analizar ganadores sin reconfigurar.</p>
                 </form>
                 {% endif %}
+            </div>
 
-                <br>
-                <a href="{{ url_for('index') }}" class="btn-volver">← Volver y generar otra tanda</a>
+            <div class="zona-fin-proceso">
+                <a href="{{ url_for('index') }}" class="btn-ir-principio">← Ir al principio</a>
+                <p class="ayuda ayuda-fin-proceso">Vuelve al inicio para elegir otro modo o generar cartones nuevos.</p>
             </div>
         </div>
     </div>

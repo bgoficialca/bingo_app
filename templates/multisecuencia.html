@@ -122,6 +122,11 @@
                         <p class="ayuda-regenerar">Descarta esta sesión y vuelve al inicio si no te gustó el PDF o los resultados.</p>
                     </form>
                 </div>
+
+                <div class="zona-fin-proceso">
+                    <a href="{{ url_for('index') }}" class="btn-ir-principio">← Ir al principio</a>
+                    <p class="ayuda ayuda-fin-proceso">Terminaste todas las secuencias. Vuelve al inicio para otra partida.</p>
+                </div>
             </section>
 
             {% else %}
