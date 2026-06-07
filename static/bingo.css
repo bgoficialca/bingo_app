@@ -22,17 +22,19 @@ body {
     min-height: 100vh;
 }
 
-/* Botón fijo: volver al menú principal */
+/* Botón fijo: volver al menú principal (todas las vistas) */
 .btn-menu-principal {
     position: fixed;
-    top: 10px;
-    right: 10px;
+    top: max(10px, env(safe-area-inset-top, 0px));
+    right: max(10px, env(safe-area-inset-right, 0px));
     z-index: 1100;
     display: flex;
     align-items: center;
     justify-content: center;
     width: 44px;
     height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     border-radius: 12px;
     background: var(--tarjeta);
     border: 2px solid #e0e0e0;
@@ -40,12 +42,18 @@ body {
     text-decoration: none;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
     transition: border-color 0.15s, background 0.15s, transform 0.12s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .btn-menu-principal:hover {
     border-color: var(--naranja);
     background: #fff8f4;
     transform: translateY(-1px);
+}
+
+.btn-menu-principal:active {
+    transform: scale(0.96);
 }
 
 .btn-menu-principal-icono {
@@ -1054,16 +1062,52 @@ body {
 @media (max-width: 480px) {
     .wizard-grid-cartones-inner {
         grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
     }
 
     .wizard-tarjeta-carton {
-        min-height: 68px;
+        min-height: 64px;
+        padding: 8px 4px;
+    }
+
+    .wizard-tarjeta-numero {
+        font-size: 1.05rem;
+    }
+
+    .wizard-tarjeta-sub {
+        font-size: 0.62rem;
     }
 
     .wizard-contador-cartones {
         width: 100%;
         margin-left: 0;
         margin-top: 4px;
+    }
+
+    .wizard-cartones-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .wizard-botones {
+        flex-direction: column;
+    }
+
+    .wizard-botones .btn-principal,
+    .wizard-botones .btn-secundario,
+    .wizard-btn-siguiente {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .wizard-paso-panel {
+        padding: 12px;
+    }
+
+    .wizard-select-bola {
+        width: 100%;
+        max-width: none;
     }
 }
 
@@ -2076,12 +2120,81 @@ body {
 }
 
 @media (max-width: 520px) {
+    /* Espacio para el botón ⌂ sin tapar títulos */
+    body > .btn-menu-principal + .pagina .encabezado-app,
+    body > .btn-menu-principal + .pagina .ms-hero {
+        padding-right: 52px;
+    }
+
     .ms-stats-panel {
         grid-template-columns: 1fr;
     }
 
+    .ms-hero {
+        padding: 16px 14px 14px;
+        border-radius: 16px;
+    }
+
     .ms-hero h1 {
-        font-size: 1.3rem;
+        font-size: 1.25rem;
+    }
+
+    .encabezado-multisecuencia .ms-indicador-secuencia {
+        font-size: 0.92rem;
+    }
+
+    /* Barra de progreso: scroll horizontal si hay muchas secuencias */
+    .ms-barra-progreso {
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        padding: 10px 8px 4px;
+        gap: 0;
+    }
+
+    .ms-paso-contenedor {
+        min-width: 34px;
+        flex-shrink: 0;
+    }
+
+    .ms-paso-progreso {
+        width: 30px;
+        height: 30px;
+        font-size: 0.72rem;
+    }
+
+    .ms-paso-etiqueta {
+        font-size: 0.58rem;
+    }
+
+    .ms-linea-progreso {
+        width: 14px;
+        margin-top: 13px;
+        flex-shrink: 0;
+    }
+
+    .ms-cuerpo-principal {
+        padding: 16px 14px;
+        border-radius: 14px;
+    }
+
+    .ms-encabezado-secuencia {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ms-bloque-secuencia,
+    .ms-tarjeta-secuencia-resumen,
+    .ms-bloque-secuencia-resumen {
+        padding: 14px;
+        border-radius: 12px;
+    }
+
+    .ms-encabezado-secuencia h3,
+    .ms-titulo-secuencia-resumen {
+        font-size: 1rem;
     }
 
     .tarjeta-patron-datos {
@@ -2094,6 +2207,75 @@ body {
 
     .ms-tarjeta-info-icono {
         grid-row: auto;
+    }
+
+    .ms-zona-descargas-final {
+        margin-top: 20px;
+        padding-top: 16px;
+    }
+
+    .ms-tarjeta-descarga {
+        padding: 14px;
+    }
+
+    .ms-acciones-siguiente .btn-principal,
+    .btn-ms-siguiente {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Stepper del flujo principal (index) */
+    .flujo-stepper {
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 10px 6px;
+        margin-bottom: 14px;
+    }
+
+    .flujo-stepper-item {
+        min-width: 54px;
+        flex-shrink: 0;
+    }
+
+    .flujo-stepper-texto {
+        font-size: 0.62rem;
+        line-height: 1.2;
+    }
+
+    .flujo-stepper-linea {
+        flex: 0 0 18px;
+        max-width: 18px;
+        margin-bottom: 16px;
+    }
+
+    .tarjeta-flujo {
+        padding: 16px 14px;
+        border-radius: 14px;
+    }
+
+    .flujo-titulo-paso {
+        font-size: 1.2rem;
+    }
+
+    #opciones-multisecuencia select {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .resumen-sub {
+        font-size: 0.88rem;
+        word-break: break-word;
+    }
+
+    .lista-patrones .tarjeta-patron {
+        padding: 14px;
+    }
+
+    .bola-destacada {
+        font-size: 1.1rem;
+        padding: 5px 12px;
     }
 }
 
@@ -3006,4 +3188,83 @@ body {
 
 .tarjeta-version[data-version="personalizada"] {
     grid-column: 1 / -1;
+}
+
+/* --- Ajustes globales móvil (safe-area y pie de página) --- */
+@supports (padding: max(0px)) {
+    body {
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+}
+
+@media (max-width: 479px) {
+    .pagina {
+        padding: 10px 10px 16px;
+    }
+
+    .btn-menu-principal {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        min-height: 42px;
+        border-radius: 10px;
+    }
+
+    body > .btn-menu-principal + .pagina .encabezado-app,
+    body > .btn-menu-principal + .pagina .ms-hero {
+        padding-right: 48px;
+    }
+
+    .tarjeta-modo {
+        padding: 14px 12px;
+    }
+
+    .tarjeta-modo-titulo {
+        font-size: 1rem;
+    }
+
+    .btn-descargar,
+    .btn-principal,
+    .btn-secundario {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
+    }
+
+    .ms-lista-resumen-secuencias {
+        gap: 12px;
+        margin: 12px 0 18px;
+    }
+
+    .ms-nota-detalle-pdf,
+    .ms-aviso-pdf-final {
+        font-size: 0.8rem;
+    }
+
+    .ms-item-final-compacto {
+        flex-wrap: wrap;
+        padding: 10px 12px;
+    }
+
+    .verificacion-dirigida {
+        padding: 12px;
+        font-size: 0.88rem;
+    }
+
+    .zona-descarga {
+        margin-top: 20px;
+        padding-top: 16px;
+    }
+
+    .flujo-acciones-paso {
+        padding: 14px 12px;
+        border-radius: 14px;
+    }
+
+    .flujo-acciones {
+        flex-direction: column;
+        align-items: stretch;
+    }
 }
