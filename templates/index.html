@@ -26,16 +26,16 @@
             <div class="flujo-stepper-linea"></div>
             <div class="flujo-stepper-item" data-paso="2">
                 <span class="flujo-stepper-num">2</span>
-                <span class="flujo-stepper-texto">Configurar</span>
+                <span class="flujo-stepper-texto">Personalizar</span>
             </div>
             <div class="flujo-stepper-linea"></div>
             <div class="flujo-stepper-item" data-paso="3">
                 <span class="flujo-stepper-num">3</span>
-                <span class="flujo-stepper-texto">Personalizar</span>
+                <span class="flujo-stepper-texto">Configurar</span>
             </div>
         </nav>
 
-        <form action="/" method="POST" id="form-bingo">
+        <form action="/" method="POST" id="form-bingo" enctype="multipart/form-data">
             <input type="hidden" name="modo_operacion" id="modo_operacion_hidden" value="{{ modo }}">
             <input type="hidden" name="detectar-ganadores" id="detectar-ganadores-hidden" value="">
 
@@ -43,7 +43,7 @@
             <section id="paso-modo" class="flujo-paso flujo-paso-activo" aria-labelledby="titulo-paso-modo">
                 <div class="tarjeta tarjeta-flujo tarjeta-seleccion-modo">
                     <h2 id="titulo-paso-modo" class="flujo-titulo-paso">¿Qué quieres hacer?</h2>
-                    <p class="flujo-subtitulo">Elige un modo. Luego configurarás la partida y personalizarás el PDF.</p>
+                    <p class="flujo-subtitulo">Elige un modo. Luego personalizarás los cartones y configurarás la partida.</p>
 
                     <div class="grid-tarjetas-modo" role="group" aria-label="Modos de generación">
                         <button type="button" class="tarjeta-modo{% if modo == 'normal' %} seleccionada{% endif %}" data-modo="normal">
@@ -76,7 +76,7 @@
                 </div>
             </section>
 
-            <!-- Paso 2: configuración según el modo -->
+            <!-- Paso 3: configuración según el modo -->
             <section id="paso-config" class="flujo-paso" hidden aria-labelledby="titulo-paso-config">
                 <div class="tarjeta tarjeta-flujo">
                     <p class="flujo-etiqueta-modo" id="etiqueta-modo-activo"></p>
@@ -271,13 +271,13 @@
                     </div>
 
                     <div class="flujo-acciones">
-                        <button type="button" class="btn-flujo-atras" data-ir-paso="1">← Cambiar modo</button>
-                        <button type="button" class="btn-flujo-principal" id="btn-ir-personalizar">Personalizar PDF →</button>
+                        <button type="button" class="btn-flujo-atras" data-ir-paso="2">← Volver a personalizar</button>
+                        <button type="submit" class="btn-flujo-generar" id="btn-generar">Generar y descargar PDF</button>
                     </div>
                 </div>
             </section>
 
-            <!-- Paso 3: personalización + vista previa -->
+            <!-- Paso 2: personalización + vista previa -->
             <section id="paso-personalizar" class="flujo-paso" hidden aria-labelledby="titulo-paso-personalizar">
                 <div class="layout-personalizar">
                     <div class="tarjeta tarjeta-flujo columna-personalizar">
@@ -315,20 +315,31 @@
                         </fieldset>
 
                         <fieldset class="grupo-personalizar">
-                            <legend>Diseño y marca de agua</legend>
+                            <legend>Diseño del PDF</legend>
                             <select id="version" name="version" class="select-version-oculto" aria-hidden="true" tabindex="-1">
-                                {% set vsel = form.version if form else '1.0' %}
-                                <option value="1.0" {% if vsel == '1.0' %}selected{% endif %}>1.0</option>
-                                <option value="2.0" {% if vsel == '2.0' %}selected{% endif %}>2.0</option>
-                                <option value="halloween 1.0" {% if vsel == 'halloween 1.0' %}selected{% endif %}>Halloween 1.0</option>
-                                <option value="navidad 2.0" {% if vsel == 'navidad 2.0' %}selected{% endif %}>Navidad 2.0</option>
-                                <option value="navidad 1.0" {% if vsel == 'navidad 1.0' %}selected{% endif %}>Navidad 1.0</option>
-                                <option value="1" {% if vsel == '1' %}selected{% endif %}>Personalizada 1</option>
-                                <option value="2" {% if vsel == '2' %}selected{% endif %}>Personalizada 2</option>
-                                <option value="3" {% if vsel == '3' %}selected{% endif %}>Personalizada 3</option>
-                                <option value="4" {% if vsel == '4' %}selected{% endif %}>Personalizada 4</option>
+                                {% set vraw = form.version if form else '1.0' %}
+                                {% set vsel = vraw if vraw in ['1.0', '2.0', 'personalizada'] else '1.0' %}
+                                <option value="1.0" {% if vsel == '1.0' %}selected{% endif %}>Clásica 1.0</option>
+                                <option value="2.0" {% if vsel == '2.0' %}selected{% endif %}>Clásica 2.0</option>
+                                <option value="personalizada" {% if vsel == 'personalizada' %}selected{% endif %}>Personalizada</option>
                             </select>
                             <div class="grid-versiones" id="grid-versiones" role="radiogroup" aria-label="Versión del diseño"></div>
+
+                            <div id="panel-imagenes-personalizadas" class="panel-upload-personalizado" hidden>
+                                <p class="ayuda ayuda-inline">Sube tus propias imágenes. El fondo cubre la hoja; el logo va en el centro libre (casilla BG).</p>
+                                <div class="fila-upload-personalizado">
+                                    <label class="etiqueta-upload" for="imagen_fondo">Imagen de fondo (página)</label>
+                                    <input type="file" name="imagen_fondo" id="imagen_fondo"
+                                        accept="image/png,image/jpeg,image/webp,image/gif">
+                                    <div class="mini-preview-upload" id="mini-preview-fondo" aria-hidden="true"></div>
+                                </div>
+                                <div class="fila-upload-personalizado">
+                                    <label class="etiqueta-upload" for="imagen_logo">Logo del centro libre</label>
+                                    <input type="file" name="imagen_logo" id="imagen_logo"
+                                        accept="image/png,image/jpeg,image/webp,image/gif">
+                                    <div class="mini-preview-upload" id="mini-preview-logo" aria-hidden="true"></div>
+                                </div>
+                            </div>
                         </fieldset>
 
                         <fieldset class="grupo-personalizar">
@@ -353,8 +364,8 @@
                         </fieldset>
 
                         <div class="flujo-acciones flujo-acciones-final">
-                            <button type="button" class="btn-flujo-atras" data-ir-paso="2">← Volver a configurar</button>
-                            <button type="submit" class="btn-flujo-generar" id="btn-generar">Generar y descargar PDF</button>
+                            <button type="button" class="btn-flujo-atras" data-ir-paso="1">← Cambiar modo</button>
+                            <button type="button" class="btn-flujo-principal" id="btn-ir-configurar">Configurar partida →</button>
                         </div>
                     </div>
 
@@ -384,16 +395,18 @@
         const RECURSOS_VERSION = {
             '1.0': { logo: "{{ url_for('static', filename='logo_v1.png') }}", watermark: "{{ url_for('static', filename='watermark_v1.png') }}" },
             '2.0': { logo: "{{ url_for('static', filename='logo_v2.png') }}", watermark: "{{ url_for('static', filename='watermark_v2.png') }}" },
-            'halloween 1.0': { logo: "{{ url_for('static', filename='logo_v1.png') }}", watermark: "{{ url_for('static', filename='halloween_v1.png') }}" },
-            'navidad 2.0': { logo: "{{ url_for('static', filename='logo_v2.png') }}", watermark: "{{ url_for('static', filename='navidad_v2.png') }}" },
-            'navidad 1.0': { logo: "{{ url_for('static', filename='logo_v1.png') }}", watermark: "{{ url_for('static', filename='navidad_v1.png') }}" },
-            '1': { logo: "{{ url_for('static', filename='logo_personalizado.png') }}", watermark: "{{ url_for('static', filename='1.png') }}" },
-            '2': { logo: "{{ url_for('static', filename='logo_personalizado.png') }}", watermark: "{{ url_for('static', filename='2.png') }}" },
-            '3': { logo: "{{ url_for('static', filename='logo_personalizado.png') }}", watermark: "{{ url_for('static', filename='3.png') }}" },
-            '4': { logo: "{{ url_for('static', filename='logo_personalizado.png') }}", watermark: "{{ url_for('static', filename='4.png') }}" }
+            'personalizada': {
+                logo: "{{ url_for('static', filename='logo_personalizado.png') }}",
+                watermark: "{{ url_for('static', filename='watermark_v1.png') }}"
+            }
         };
 
+        /** URLs locales (object URL) de imágenes subidas en diseño personalizada */
+        const urlsPersonalizadas = { logo: null, watermark: null };
+
         let logoPreviewActual = RECURSOS_VERSION['1.0'].logo;
+
+        const PASOS_FLUJO = ['paso-modo', 'paso-personalizar', 'paso-config'];
 
         const HIDDEN_PATRON = { cuadro: 'patron2_celdas', linea: 'patron1_celdas' };
 
@@ -734,7 +747,39 @@
         }
 
         function recursosDeVersion(version) {
-            return RECURSOS_VERSION[version] || RECURSOS_VERSION['2.0'];
+            if (version === 'personalizada') {
+                return {
+                    logo: urlsPersonalizadas.logo || RECURSOS_VERSION.personalizada.logo,
+                    watermark: urlsPersonalizadas.watermark || RECURSOS_VERSION.personalizada.watermark
+                };
+            }
+            return RECURSOS_VERSION[version] || RECURSOS_VERSION['1.0'];
+        }
+
+        function actualizarPanelImagenesPersonalizadas() {
+            const panel = document.getElementById('panel-imagenes-personalizadas');
+            if (panel) panel.hidden = !esVersionPersonalizada();
+        }
+
+        function mostrarMiniPreview(inputId, contenedorId, tipoUrl) {
+            const input = document.getElementById(inputId);
+            const contenedor = document.getElementById(contenedorId);
+            const archivo = input.files[0];
+            if (!archivo) {
+                contenedor.innerHTML = '';
+                contenedor.setAttribute('aria-hidden', 'true');
+                if (urlsPersonalizadas[tipoUrl]) {
+                    URL.revokeObjectURL(urlsPersonalizadas[tipoUrl]);
+                    urlsPersonalizadas[tipoUrl] = null;
+                }
+                updatePreview();
+                return;
+            }
+            if (urlsPersonalizadas[tipoUrl]) URL.revokeObjectURL(urlsPersonalizadas[tipoUrl]);
+            urlsPersonalizadas[tipoUrl] = URL.createObjectURL(archivo);
+            contenedor.innerHTML = '<img src="' + urlsPersonalizadas[tipoUrl] + '" alt="Vista previa">';
+            contenedor.setAttribute('aria-hidden', 'false');
+            updatePreview();
         }
 
         function updatePreview() {
@@ -747,6 +792,7 @@
             document.getElementById('enumeracionText').style.color = document.getElementById('color_enumeracion').value;
             document.getElementById('previewWatermark').src = recursos.watermark;
             document.querySelectorAll('#numerosPreview .celda-logo img').forEach(img => { img.src = recursos.logo; });
+            actualizarPanelImagenesPersonalizadas();
         }
 
         function renderizarCartonPreview(numerosCarton, numeroCarton) {
@@ -794,13 +840,7 @@
         const VERSIONES_UI = [
             { id: '1.0', nombre: 'Clásica 1.0' },
             { id: '2.0', nombre: 'Clásica 2.0' },
-            { id: 'halloween 1.0', nombre: 'Halloween' },
-            { id: 'navidad 1.0', nombre: 'Navidad 1.0' },
-            { id: 'navidad 2.0', nombre: 'Navidad 2.0' },
-            { id: '1', nombre: 'Personalizada 1' },
-            { id: '2', nombre: 'Personalizada 2' },
-            { id: '3', nombre: 'Personalizada 3' },
-            { id: '4', nombre: 'Personalizada 4' }
+            { id: 'personalizada', nombre: 'Personalizada (sube tus imágenes)' }
         ];
 
         const PRESETS_COLOR = {
@@ -828,7 +868,7 @@
 
         function irAPaso(num) {
             flujoApp.paso = num;
-            ['paso-modo', 'paso-config', 'paso-personalizar'].forEach((id, idx) => {
+            PASOS_FLUJO.forEach((id, idx) => {
                 const el = document.getElementById(id);
                 const activo = idx + 1 === num;
                 el.hidden = !activo;
@@ -839,8 +879,8 @@
                 item.classList.toggle('activo', n === num);
                 item.classList.toggle('completado', n < num);
             });
-            if (num === 2) prepararPasoConfig();
-            if (num === 3) prepararPasoPersonalizar();
+            if (num === 2) prepararPasoPersonalizar();
+            if (num === 3) prepararPasoConfig();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -920,8 +960,35 @@
             }
         }
 
-        function validarAntesDePersonalizar() {
+        function esVersionPersonalizada() {
+            return document.getElementById('version').value === 'personalizada';
+        }
+
+        /** Paso 2 → 3: exige imágenes si eligió diseño personalizada */
+        function validarAntesDeConfigurar() {
+            if (esVersionPersonalizada()) {
+                const tieneLogo = document.getElementById('imagen_logo').files.length > 0;
+                const tieneFondo = document.getElementById('imagen_fondo').files.length > 0;
+                if (!tieneLogo || !tieneFondo) {
+                    alert('En diseño personalizada sube la imagen de fondo y el logo del centro libre antes de continuar.');
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /** Antes de enviar el formulario (paso 3) */
+        function validarAntesDeGenerar() {
             const modo = modoSeleccionado();
+            if (esVersionPersonalizada()) {
+                const tieneLogo = document.getElementById('imagen_logo').files.length > 0;
+                const tieneFondo = document.getElementById('imagen_fondo').files.length > 0;
+                if (!tieneLogo || !tieneFondo) {
+                    alert('En diseño personalizada debes subir la imagen de fondo y el logo.');
+                    irAPaso(2);
+                    return false;
+                }
+            }
             if (modo === 'detectar') {
                 sincronizarPatronesDetectar();
                 document.getElementById('nombre_patron1').value = document.getElementById('nombre_patron1_detectar').value;
@@ -929,14 +996,14 @@
             }
             if (modo === 'dirigido') {
                 if (!asistenteDirigido.listo) {
-                    alert('Completa el asistente dirigido antes de personalizar el PDF.');
+                    alert('Completa el asistente dirigido antes de generar el PDF.');
                     return false;
                 }
                 serializarConfigDesdeAsistente();
             }
             if (modo === 'multisecuencia' && document.getElementById('multisecuencia_dirigido').checked) {
                 if (!asistenteDirigido.listo) {
-                    alert('Completa el asistente de la secuencia 1 antes de continuar.');
+                    alert('Completa el asistente de la secuencia 1 antes de generar.');
                     return false;
                 }
                 serializarConfigDesdeAsistente();
@@ -966,7 +1033,7 @@
                         t.classList.toggle('seleccionada', t.dataset.version === v.id);
                     });
                     updatePreview();
-                    if (flujoApp.paso === 3) actualizarResumenFlujo();
+                    if (flujoApp.paso === 2) actualizarResumenFlujo();
                 });
                 grid.appendChild(btn);
             });
@@ -988,8 +1055,14 @@
                 btn.addEventListener('click', () => seleccionarModoTarjeta(btn.dataset.modo));
             });
             document.getElementById('btn-continuar-modo').addEventListener('click', () => irAPaso(2));
-            document.getElementById('btn-ir-personalizar').addEventListener('click', () => {
-                if (validarAntesDePersonalizar()) irAPaso(3);
+            document.getElementById('btn-ir-configurar').addEventListener('click', () => {
+                if (validarAntesDeConfigurar()) irAPaso(3);
+            });
+            document.getElementById('imagen_fondo').addEventListener('change', () => {
+                mostrarMiniPreview('imagen_fondo', 'mini-preview-fondo', 'watermark');
+            });
+            document.getElementById('imagen_logo').addEventListener('change', () => {
+                mostrarMiniPreview('imagen_logo', 'mini-preview-logo', 'logo');
             });
             document.querySelectorAll('[data-ir-paso]').forEach(btn => {
                 btn.addEventListener('click', () => irAPaso(parseInt(btn.dataset.irPaso, 10)));
@@ -1009,7 +1082,7 @@
                 actualizarAyudaPaginas();
                 actualizarResumenFlujo();
             });
-            {% if error %}irAPaso(2);{% endif %}
+            {% if error %}irAPaso(3);{% endif %}
         }
 
         function totalCartonesFormulario() {
@@ -1172,18 +1245,18 @@
 
         document.getElementById('version').addEventListener('change', () => {
             updatePreview();
-            if (flujoApp.paso === 3) actualizarResumenFlujo();
+            if (flujoApp.paso === 2) actualizarResumenFlujo();
         });
         document.getElementById('btn-refrescar-preview').addEventListener('click', cargarCartonMuestra);
         document.getElementById('btn-nombre-aleatorio').addEventListener('click', () => {
             document.getElementById('nombre_archivo').value = 'cartones_BG (' + (Math.floor(Math.random() * 100) + 1) + ')';
-            if (flujoApp.paso === 3) actualizarResumenFlujo();
+            if (flujoApp.paso === 2) actualizarResumenFlujo();
         });
         document.getElementById('nombre_archivo').addEventListener('input', () => {
-            if (flujoApp.paso === 3) actualizarResumenFlujo();
+            if (flujoApp.paso === 2) actualizarResumenFlujo();
         });
         document.getElementById('multisecuencia_total')?.addEventListener('change', () => {
-            if (flujoApp.paso === 3) actualizarResumenFlujo();
+            if (flujoApp.paso === 2) actualizarResumenFlujo();
         });
 
         document.querySelectorAll('.patron-activo-check').forEach(check => {
@@ -1225,7 +1298,7 @@
 
         document.getElementById('total_cartones').addEventListener('input', () => {
             actualizarAyudaPaginas();
-            if (flujoApp.paso === 3) actualizarResumenFlujo();
+            if (flujoApp.paso === 2) actualizarResumenFlujo();
             if (modoSeleccionado() === 'dirigido') {
                 reiniciarAsistenteDirigido(true);
             }
@@ -1250,6 +1323,10 @@
         });
 
         document.getElementById('form-bingo').addEventListener('submit', (e) => {
+            if (!validarAntesDeGenerar()) {
+                e.preventDefault();
+                return;
+            }
             if (modoSeleccionado() === 'multisecuencia') {
                 const usarDirigido = document.getElementById('multisecuencia_dirigido').checked;
                 if (usarDirigido) {

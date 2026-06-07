@@ -78,29 +78,62 @@ def ruta_estatica(nombre_archivo):
     return os.path.join(STATIC_DIR, nombre_archivo)
 
 
+EXTENSIONES_IMAGEN_PERMITIDAS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
 def resolver_recursos_version(version):
     """Devuelve rutas de logo y marca de agua según la versión del diseño (PDF y vista previa)."""
     if version == "1.0":
         return ruta_estatica("logo_v1.png"), ruta_estatica("watermark_v1.png")
-    if version == "navidad 1.0":
-        return ruta_estatica("logo_v1.png"), ruta_estatica("navidad_v1.png")
-    if version == "navidad 2.0":
-        return ruta_estatica("logo_v2.png"), ruta_estatica("navidad_v2.png")
-    if version == "halloween 1.0":
-        return ruta_estatica("logo_v1.png"), ruta_estatica("halloween_v1.png")
-    if version == "halloween 2.0":
-        return ruta_estatica("logo_v2.png"), ruta_estatica("halloween_v2.png")
-    if version == "1":
-        return ruta_estatica("logo_personalizado.png"), ruta_estatica("1.png")
-    if version == "2":
-        return ruta_estatica("logo_personalizado.png"), ruta_estatica("2.png")
-    if version == "3":
-        return ruta_estatica("logo_personalizado.png"), ruta_estatica("3.png")
-    if version == "4":
-        return ruta_estatica("logo_personalizado.png"), ruta_estatica("4.png")
     if version == "2.0":
         return ruta_estatica("logo_v2.png"), ruta_estatica("watermark_v2.png")
+    if version == "personalizada":
+        return (
+            ruta_estatica("logo_personalizado.png"),
+            ruta_estatica("watermark_v1.png"),
+        )
+    # Compatibilidad con versiones antiguas guardadas en sesiones
+    if version in ("navidad 1.0", "halloween 1.0", "1", "3", "4"):
+        return ruta_estatica("logo_v1.png"), ruta_estatica("watermark_v1.png")
     return ruta_estatica("logo_v2.png"), ruta_estatica("watermark_v2.png")
+
+
+def validar_y_guardar_imagen_subida(archivo, etiqueta):
+    """Guarda una imagen enviada por el usuario y devuelve la ruta absoluta."""
+    if not archivo or not getattr(archivo, "filename", None) or not archivo.filename.strip():
+        return None
+    _, extension = os.path.splitext(archivo.filename.strip().lower())
+    if extension not in EXTENSIONES_IMAGEN_PERMITIDAS:
+        raise ValueError(
+            f"La imagen de {etiqueta} debe ser PNG, JPG, WEBP o GIF."
+        )
+    nombre_seguro = f"custom_{etiqueta}_{secrets.token_hex(8)}{extension}"
+    ruta_destino = os.path.join(carpeta_para_guardar(), nombre_seguro)
+    archivo.save(ruta_destino)
+    return ruta_destino
+
+
+def resolver_recursos_generacion(version, logo_custom=None, fondo_custom=None):
+    """Combina versión clásica o archivos subidos para el PDF."""
+    if version == "personalizada":
+        logo = logo_custom or ruta_estatica("logo_personalizado.png")
+        fondo = fondo_custom or ruta_estatica("watermark_v1.png")
+        return logo, fondo
+    return resolver_recursos_version(version)
+
+
+def obtener_rutas_imagenes_formulario():
+    """Lee las imágenes del formulario cuando el diseño es personalizada."""
+    version = request.form.get("version", "1.0")
+    if version != "personalizada":
+        return None
+    logo = validar_y_guardar_imagen_subida(request.files.get("imagen_logo"), "logo")
+    fondo = validar_y_guardar_imagen_subida(request.files.get("imagen_fondo"), "fondo")
+    if not logo or not fondo:
+        raise ValueError(
+            "En diseño personalizada debes subir la imagen de fondo y el logo del centro libre."
+        )
+    return logo, fondo
 
 
 def recursos_version_para_web(version):
@@ -289,7 +322,7 @@ def analizar_secuencia_sobre_cartones(
     return secuencia_llamados, resumen
 
 
-def _ejecutar_secuencia1_multisecuencia_dirigido(form, total_cartones):
+def _ejecutar_secuencia1_multisecuencia_dirigido(form, total_cartones, rutas_imagenes=None):
     """Secuencia 1 con asistente dirigido: genera cartones diseñados."""
     color_carton = form.get("color_carton", "#fe630b")
     color_bingo = form.get("color_bingo", "#000000")
@@ -337,6 +370,7 @@ def _ejecutar_secuencia1_multisecuencia_dirigido(form, total_cartones):
         secuencia_cartones=secuencia_cartones,
         total_cartones=total_cartones,
         nombre_base=nombre_base,
+        rutas_imagenes=rutas_imagenes,
     )
 
     registro = registro_secuencia_multisecuencia(
@@ -353,13 +387,15 @@ def _ejecutar_secuencia1_multisecuencia_dirigido(form, total_cartones):
     return pdf_path, nombre_base, secuencia_cartones, registro
 
 
-def _ejecutar_secuencia1_multisecuencia_detectar(form, total_cartones):
+def _ejecutar_secuencia1_multisecuencia_detectar(form, total_cartones, rutas_imagenes=None):
     """Secuencia 1 al azar + detectar (sin asistente dirigido)."""
     config = _config_regenerar_detectar(form)
     secuencia_llamados = parsear_secuencia_numeros(config.get("secuencia_numeros", ""))
     validar_secuencia_modo_dirigido(secuencia_llamados)
 
-    pdf_path, nombre_base, resumen, secuencia_cartones = _ejecutar_modo_detectar(config)
+    pdf_path, nombre_base, resumen, secuencia_cartones = _ejecutar_modo_detectar(
+        config, rutas_imagenes=rutas_imagenes
+    )
 
     patron1 = parsear_patron_celdas(config.get("patron1_celdas", ""))
     patron2 = parsear_patron_celdas(config.get("patron2_celdas", ""))
@@ -379,7 +415,7 @@ def _ejecutar_secuencia1_multisecuencia_detectar(form, total_cartones):
     return pdf_path, nombre_base, secuencia_cartones, registro
 
 
-def iniciar_multisecuencia_desde_form(form):
+def iniciar_multisecuencia_desde_form(form, rutas_imagenes=None):
     """Arranca el flujo multisecuencia con la secuencia 1 (dirigido opcional)."""
     total_secuencias = validar_total_secuencias_multisecuencia(
         form.get("multisecuencia_total")
@@ -391,11 +427,15 @@ def iniciar_multisecuencia_desde_form(form):
     usar_dirigido = form.get("multisecuencia_dirigido") == "on"
     if usar_dirigido:
         pdf_path, nombre_base, cartones, registro = (
-            _ejecutar_secuencia1_multisecuencia_dirigido(form, total_cartones)
+            _ejecutar_secuencia1_multisecuencia_dirigido(
+                form, total_cartones, rutas_imagenes=rutas_imagenes
+            )
         )
     else:
         pdf_path, nombre_base, cartones, registro = (
-            _ejecutar_secuencia1_multisecuencia_detectar(form, total_cartones)
+            _ejecutar_secuencia1_multisecuencia_detectar(
+                form, total_cartones, rutas_imagenes=rutas_imagenes
+            )
         )
 
     sesion = {
@@ -2543,12 +2583,16 @@ def generar_pdf_personalizado(
     secuencia_cartones=None,
     total_cartones=6,
     nombre_base=NOMBRE_BASE_DEFAULT,
+    rutas_imagenes=None,
 ):
     pdf = FPDF("P", "mm", "A4")
     pdf.set_auto_page_break(auto=True, margin=10)
     pdf.add_font("ArialBlackItalic", "", ruta_fuente_arial())
 
-    logo_path, watermark_path = resolver_recursos_version(version)
+    if rutas_imagenes:
+        logo_path, watermark_path = rutas_imagenes
+    else:
+        logo_path, watermark_path = resolver_recursos_generacion(version)
 
     ancho_carton = 75
     alto_carton = 87
@@ -2645,7 +2689,7 @@ def _config_regenerar_detectar(form):
     }
 
 
-def _ejecutar_modo_detectar(config):
+def _ejecutar_modo_detectar(config, rutas_imagenes=None):
     """Genera cartones al azar y detecta ganadores con la secuencia guardada."""
     color_carton = config["color_carton"]
     color_bingo = config["color_bingo"]
@@ -2681,6 +2725,7 @@ def _ejecutar_modo_detectar(config):
         secuencia_cartones=secuencia_cartones,
         total_cartones=total_cartones,
         nombre_base=nombre_base,
+        rutas_imagenes=rutas_imagenes,
     )
 
     resumen["total_cartones"] = total_generados
@@ -2713,6 +2758,15 @@ def _form_a_dict():
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
+        try:
+            rutas_imagenes = obtener_rutas_imagenes_formulario()
+        except ValueError as error:
+            return render_template(
+                "index.html",
+                error=str(error),
+                form=_form_a_dict(),
+            )
+
         color_carton = request.form.get("color_carton", "#fe630b")
         color_bingo = request.form.get("color_bingo", "#000000")
         color_enumeracion = request.form.get("color_enumeracion", "#000000")
@@ -2735,7 +2789,9 @@ def index():
 
         if modo_operacion == "multisecuencia":
             try:
-                token = iniciar_multisecuencia_desde_form(request.form)
+                token = iniciar_multisecuencia_desde_form(
+                    request.form, rutas_imagenes=rutas_imagenes
+                )
                 return redirect(url_for("multisecuencia_paso", token=token))
             except ValueError as error:
                 return render_template(
@@ -2812,6 +2868,7 @@ def index():
                     secuencia_cartones=secuencia_cartones,
                     total_cartones=total_cartones,
                     nombre_base=nombre_base,
+                    rutas_imagenes=rutas_imagenes,
                 )
 
                 resumen["total_cartones"] = total_generados
@@ -2840,7 +2897,8 @@ def index():
         if detectar_ganadores_modo:
             try:
                 pdf_path, nombre_base, resumen, _ = _ejecutar_modo_detectar(
-                    _config_regenerar_detectar(request.form)
+                    _config_regenerar_detectar(request.form),
+                    rutas_imagenes=rutas_imagenes,
                 )
                 token = publicar_pdf_temporal(
                     pdf_path,
@@ -2865,6 +2923,7 @@ def index():
             secuencia_cartones=secuencia_cartones,
             total_cartones=total_cartones,
             nombre_base=nombre_base,
+            rutas_imagenes=rutas_imagenes,
         )
         return send_file(pdf_path, as_attachment=True, download_name=f"{nombre_base}.pdf")
 
