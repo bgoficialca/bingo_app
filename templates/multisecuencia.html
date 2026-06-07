@@ -1,4 +1,5 @@
-{% from '_macro_patrones.html' import tarjetas_ganadores %}
+{% from '_macro_patrones.html' import resumen_secuencia_simple %}
+{% from '_macro_navegacion.html' import boton_menu_principal %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,27 +8,60 @@
     <title>Multisecuencia — {{ nombre_base }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='bingo.css') }}">
 </head>
-<body>
+<body class="pagina-ms pagina-modo-multisecuencia">
+    {{ boton_menu_principal() }}
     <div class="pagina pagina-multisecuencia">
-        <header class="encabezado-app encabezado-multisecuencia">
-            <h1>Modo multisecuencia</h1>
-            <p class="ms-indicador-secuencia">
-                {% if sesion.fase == 'final' %}
-                Todas las secuencias completadas ({{ sesion.secuencias_completadas }} de {{ sesion.total_secuencias }})
-                {% elif sesion.fase == 'formulario' %}
-                Configura la <strong>Secuencia {{ proxima_secuencia }}</strong> de {{ sesion.total_secuencias }}
-                {% else %}
-                <strong>Secuencia {{ entrada_actual.numero if entrada_actual else 1 }}</strong>
-                de {{ sesion.total_secuencias }}
-                {% endif %}
-            </p>
+        <header class="ms-hero encabezado-multisecuencia">
+            <div class="ms-hero-contenido">
+                <p class="ms-hero-etiqueta">Modo multisecuencia</p>
+                <h1>{{ nombre_base }}</h1>
+                <p class="ms-indicador-secuencia">
+                    {% if sesion.fase == 'final' %}
+                    Partida completada — <strong>{{ sesion.secuencias_completadas }}</strong> de
+                    <strong>{{ sesion.total_secuencias }}</strong> secuencias analizadas
+                    {% elif sesion.fase == 'formulario' %}
+                    Configura la <strong>secuencia {{ proxima_secuencia }}</strong> de {{ sesion.total_secuencias }}
+                    {% else %}
+                    Resultados de la <strong>secuencia {{ entrada_actual.numero if entrada_actual else 1 }}</strong>
+                    de {{ sesion.total_secuencias }}
+                    {% endif %}
+                </p>
+            </div>
+
+            <div class="ms-stats-panel">
+                <article class="ms-stat-card">
+                    <span class="ms-stat-valor">{{ sesion.cartones|length }}</span>
+                    <span class="ms-stat-etiqueta">Cartones en el PDF</span>
+                </article>
+                <article class="ms-stat-card">
+                    <span class="ms-stat-valor">{{ sesion.secuencias_completadas }}/{{ sesion.total_secuencias }}</span>
+                    <span class="ms-stat-etiqueta">Secuencias listas</span>
+                </article>
+                <article class="ms-stat-card">
+                    <span class="ms-stat-valor">{{ nombre_base }}.pdf</span>
+                    <span class="ms-stat-etiqueta">Archivo de cartones</span>
+                </article>
+            </div>
 
             <div class="ms-barra-progreso" aria-label="Progreso de secuencias">
                 {% for n in range(1, sesion.total_secuencias + 1) %}
-                <span class="ms-paso-progreso {% if n <= sesion.secuencias_completadas %}completado{% elif n == proxima_secuencia and sesion.fase == 'formulario' %}activo{% endif %}">
-                    {{ n }}
-                </span>
-                {% if not loop.last %}<span class="ms-linea-progreso"></span>{% endif %}
+                {% set clase_paso = 'pendiente' %}
+                {% if n <= sesion.secuencias_completadas %}
+                    {% set clase_paso = 'completado' %}
+                {% elif sesion.fase == 'formulario' and n == proxima_secuencia %}
+                    {% set clase_paso = 'activo' %}
+                {% elif sesion.fase == 'resultados' and n == sesion.secuencias_completadas %}
+                    {% set clase_paso = 'revisando' %}
+                {% endif %}
+                <div class="ms-paso-contenedor">
+                    <span class="ms-paso-progreso {{ clase_paso }}" title="Secuencia {{ n }}">
+                        {% if clase_paso == 'completado' %}✓{% else %}{{ n }}{% endif %}
+                    </span>
+                    <span class="ms-paso-etiqueta">Seq. {{ n }}</span>
+                </div>
+                {% if not loop.last %}
+                <span class="ms-linea-progreso {% if n < sesion.secuencias_completadas or (sesion.fase == 'resultados' and n < sesion.secuencias_completadas) %}completada{% elif n == sesion.secuencias_completadas and sesion.fase != 'final' %}activa{% endif %}"></span>
+                {% endif %}
                 {% endfor %}
             </div>
         </header>
@@ -39,52 +73,65 @@
         <div class="tarjeta resultados-cuerpo ms-cuerpo-principal">
             {% if sesion.fase == 'formulario' %}
             <section class="ms-formulario-secuencia tarjeta-flujo">
-                <p class="flujo-etiqueta-modo">Secuencia {{ proxima_secuencia }} de {{ sesion.total_secuencias }}</p>
-                <h2 class="resumen-titulo">Analizar esta partida</h2>
-                <p class="resumen-sub">
-                    Mismos cartones del PDF <strong>{{ nombre_base }}</strong>.
-                    Ingresa <strong>75 bolas</strong> y los patrones para esta secuencia.
-                </p>
-
-                <div class="ms-aviso-pdf">
-                    <a href="{{ url_for('descargar', token=token) }}" class="btn-descargar btn-descargar-compacto">
-                        Descargar PDF de cartones
-                    </a>
+                <div class="ms-cabecera-seccion">
+                    <span class="ms-numero-paso">Paso {{ proxima_secuencia }}</span>
+                    <h2 class="resumen-titulo">Analizar secuencia {{ proxima_secuencia }}</h2>
+                    <p class="resumen-sub">
+                        Usarás los <strong>mismos cartones</strong> del PDF ya generado.
+                        Ingresa las 75 bolas y los patrones de esta partida.
+                    </p>
                 </div>
+
+                <aside class="ms-tarjeta-info ms-tarjeta-info-secundaria">
+                    <div class="ms-tarjeta-info-icono" aria-hidden="true">📄</div>
+                    <div class="ms-tarjeta-info-texto">
+                        <strong>PDF de cartones listo</strong>
+                        <p>Descárgalo si necesitas repartirlo antes de analizar esta secuencia.</p>
+                    </div>
+                    <a href="{{ url_for('descargar', token=token) }}" class="btn-descargar btn-descargar-compacto">
+                        Descargar {{ nombre_base }}.pdf
+                    </a>
+                </aside>
 
                 <form method="POST" action="{{ url_for('multisecuencia_paso', token=token) }}" id="form-secuencia-ms" class="ms-form-secuencia">
                     <input type="hidden" name="accion" value="analizar">
                     <input type="hidden" name="patron1_celdas" id="patron1_celdas_ms" value="">
                     <input type="hidden" name="patron2_celdas" id="patron2_celdas_ms" value="">
 
-                    <label for="secuencia_numeros_ms">Secuencia de 75 bolas</label>
-                    <textarea name="secuencia_numeros" id="secuencia_numeros_ms" class="textarea-secuencia"
-                        placeholder="1, 5, 12, 18, ... (75 números del 1 al 75)" required></textarea>
+                    <div class="ms-paso-formulario panel-modo-detectar">
+                        <h3 class="ms-subtitulo-seccion"><span class="ms-paso-form-num">1</span> Secuencia de bolas</h3>
+                        <label for="secuencia_numeros_ms">75 números del 1 al 75, sin repetir</label>
+                        <textarea name="secuencia_numeros" id="secuencia_numeros_ms" class="textarea-secuencia"
+                            placeholder="1, 5, 12, 18, 23, ... (75 números separados por coma)" required></textarea>
+                        <p class="ms-contador-bolas" id="ms-contador-bolas" aria-live="polite">0 / 75 bolas ingresadas</p>
+                    </div>
 
-                    <h3 class="ms-subtitulo-seccion">Patrones de esta secuencia</h3>
-                    <p class="ayuda">Marca las formas y ponles nombre. <strong>Cartón lleno</strong> siempre activo.</p>
+                    <div class="ms-paso-formulario panel-modo-detectar">
+                        <h3 class="ms-subtitulo-seccion"><span class="ms-paso-form-num">2</span> Patrones de esta secuencia</h3>
+                        <p class="ayuda">Marca las celdas en cada cartón y asigna un nombre. El <strong>cartón lleno</strong> se evalúa siempre.</p>
 
-                    <div class="patrones-detectar-grid">
-                        <article class="patron-detectar-card">
-                            <h4 class="titulo-patron-detectar">Patrón 1</h4>
-                            <label for="nombre_patron2_ms">Nombre del patrón</label>
-                            <input type="text" id="nombre_patron2_ms" name="nombre_patron2" maxlength="40"
-                                placeholder="Ej: cuadro, cruz...">
-                            <div class="patron-encabezado">
-                                <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
-                            </div>
-                            <div class="patron-grid patron-grid-tactil" id="grid-patron2-ms"></div>
-                        </article>
-                        <article class="patron-detectar-card">
-                            <h4 class="titulo-patron-detectar">Patrón 2</h4>
-                            <label for="nombre_patron1_ms">Nombre del patrón</label>
-                            <input type="text" id="nombre_patron1_ms" name="nombre_patron1" maxlength="40"
-                                placeholder="Ej: línea, diagonal...">
-                            <div class="patron-encabezado">
-                                <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
-                            </div>
-                            <div class="patron-grid patron-grid-tactil" id="grid-patron1-ms"></div>
-                        </article>
+                        <div class="patrones-detectar-grid ms-patrones-claro">
+                            <article class="patron-detectar-card">
+                                <h4 class="titulo-patron-detectar">Patrón 1</h4>
+                                <label for="nombre_patron2_ms">Nombre del patrón</label>
+                                <input type="text" id="nombre_patron2_ms" name="nombre_patron2" maxlength="40"
+                                    placeholder="Ej: cuadro, cruz, esquina...">
+                                <div class="patron-encabezado">
+                                    <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+                                </div>
+                                <div class="patron-grid patron-grid-tactil" id="grid-patron2-ms"></div>
+                            </article>
+                            <article class="patron-detectar-card">
+                                <h4 class="titulo-patron-detectar">Patrón 2</h4>
+                                <label for="nombre_patron1_ms">Nombre del patrón</label>
+                                <input type="text" id="nombre_patron1_ms" name="nombre_patron1" maxlength="40"
+                                    placeholder="Ej: línea, diagonal, T...">
+                                <div class="patron-encabezado">
+                                    <span>B</span><span>I</span><span>N</span><span>G</span><span>O</span>
+                                </div>
+                                <div class="patron-grid patron-grid-tactil" id="grid-patron1-ms"></div>
+                            </article>
+                        </div>
                     </div>
 
                     <button type="submit" class="btn-principal btn-ms-analizar">
@@ -95,120 +142,78 @@
 
             {% elif sesion.fase == 'final' %}
             <section class="ms-pantalla-final">
-                <h2 class="resumen-titulo">Resumen completo</h2>
-                <p class="resumen-sub">
-                    Completaste las <strong>{{ sesion.total_secuencias }}</strong> secuencias
-                    con el mismo PDF de cartones.
-                </p>
+                <div class="ms-banner-final">
+                    <span class="ms-banner-icono" aria-hidden="true">🏆</span>
+                    <div>
+                        <h2 class="resumen-titulo">Resumen de todas las secuencias</h2>
+                        <p class="resumen-sub">
+                            <strong>{{ sesion.total_secuencias }}</strong> secuencia{% if sesion.total_secuencias > 1 %}s{% endif %}
+                            sobre <strong>{{ sesion.cartones|length }}</strong> cartones.
+                        </p>
+                    </div>
+                </div>
 
                 <div class="ms-lista-resumen-secuencias">
                     {% for entrada in sesion.secuencias %}
-                    <article class="ms-bloque-secuencia">
-                        <header class="ms-encabezado-secuencia">
-                            <h3>Secuencia {{ entrada.numero }}</h3>
-                            <span class="ms-etiqueta-tipo">
-                                {% if entrada.tipo_generacion == 'dirigido' %}
-                                Modo dirigido
-                                {% else %}
-                                Detectar ganadores
-                                {% endif %}
-                            </span>
-                        </header>
-                        {{ tarjetas_ganadores(entrada.resumen) }}
-                    </article>
+                    {{ resumen_secuencia_simple(entrada, nota_pdf=true) }}
                     {% endfor %}
                 </div>
 
-                <div class="zona-descarga ms-zona-final">
-                    <p>Descargas disponibles</p>
-                    <a href="{{ url_for('descargar', token=token) }}" class="btn-descargar">
-                        PDF de cartones ({{ nombre_base }}.pdf)
-                    </a>
-                    <a href="{{ url_for('multisecuencia_resumen_pdf', token=token) }}" class="btn-descargar btn-resumen-ms">
-                        PDF resumen de todas las secuencias
-                    </a>
+                <div class="ms-zona-descargas-final">
+                    <h3 class="ms-zona-descargas-titulo">Descargas</h3>
+                    <div class="ms-tarjetas-descarga">
+                        <a href="{{ url_for('descargar', token=token) }}" class="ms-tarjeta-descarga">
+                            <span class="ms-tarjeta-descarga-icono" aria-hidden="true">📥</span>
+                            <span class="ms-tarjeta-descarga-titulo">PDF de cartones</span>
+                            <span class="ms-tarjeta-descarga-detalle">{{ nombre_base }}.pdf</span>
+                        </a>
+                        <a href="{{ url_for('multisecuencia_resumen_pdf', token=token) }}"
+                            class="ms-tarjeta-descarga ms-tarjeta-descarga-resumen"
+                            download="{{ nombre_base }}_resumen_secuencias.pdf">
+                            <span class="ms-tarjeta-descarga-icono" aria-hidden="true">📋</span>
+                            <span class="ms-tarjeta-descarga-titulo">PDF resumen completo</span>
+                            <span class="ms-tarjeta-descarga-detalle">Bolas, patrones y ganadores</span>
+                        </a>
+                    </div>
+
                     <form action="{{ url_for('multisecuencia_empezar_cero', token=token) }}" method="POST" class="form-empezar-cero">
                         <button type="submit" class="btn-regenerar">Empezar de cero</button>
-                        <p class="ayuda-regenerar">Descarta esta sesión si quieres configurar otra partida desde cero.</p>
                     </form>
                 </div>
 
                 <div class="zona-fin-proceso">
                     <a href="{{ url_for('index') }}" class="btn-ir-principio">← Ir al principio</a>
-                    <p class="ayuda ayuda-fin-proceso">Vuelve al menú para otra partida.</p>
                 </div>
             </section>
 
             {% else %}
-            {% set resumen = entrada_actual.resumen %}
-            <h2 class="resumen-titulo">
-                {% if entrada_actual.tipo_generacion == 'dirigido' %}
-                Ganadores — Secuencia {{ entrada_actual.numero }} (dirigido)
-                {% else %}
-                Ganadores — Secuencia {{ entrada_actual.numero }}
-                {% endif %}
-            </h2>
-            <p class="resumen-sub">
-                <strong>{{ resumen.total_cartones }}</strong> cartones en el PDF.
-                Secuencia analizada: {{ resumen.secuencia_texto }}
-            </p>
+            <section class="ms-panel-resultados">
+                {{ resumen_secuencia_simple(entrada_actual) }}
 
-            {% if entrada_actual.verificacion_dirigida %}
-            <section class="verificacion-dirigida {% if entrada_actual.verificacion_dirigida.todos_ok %}ok{% else %}fallo{% endif %}">
-                <h3>Verificación del modo dirigido</h3>
-                <p class="verificacion-resumen">
-                    {% if entrada_actual.verificacion_dirigida.todos_ok %}
-                    ✓ Todos los ganadores planeados coinciden con la simulación.
+                <div class="ms-acciones-siguiente flujo-acciones-paso">
+                    {% if sesion.secuencias_completadas < sesion.total_secuencias %}
+                    <form method="POST" action="{{ url_for('multisecuencia_paso', token=token) }}">
+                        <input type="hidden" name="accion" value="continuar">
+                        <button type="submit" class="btn-flujo-principal btn-ms-siguiente">
+                            Siguiente secuencia ({{ proxima_secuencia }}) →
+                        </button>
+                    </form>
                     {% else %}
-                    ⚠ Revisa la configuración de la secuencia 1.
+                    <form method="POST" action="{{ url_for('multisecuencia_paso', token=token) }}">
+                        <input type="hidden" name="accion" value="continuar">
+                        <button type="submit" class="btn-flujo-principal btn-ms-siguiente">
+                            Finalizar y descargar resumen →
+                        </button>
+                    </form>
                     {% endif %}
-                </p>
-                <ul class="lista-verificacion">
-                    {% for item in entrada_actual.verificacion_dirigida.detalle %}
-                    <li class="{% if item.ok %}item-ok{% else %}item-fallo{% endif %}">
-                        Cartón <strong>{{ item.carton }}</strong>:
-                        {% if item.ok %}
-                        ganó <strong>{{ item.nombre_patron }}</strong> en la bola {{ item.bola_esperada }} (verificado).
-                        {% else %}
-                        se esperaba <strong>{{ item.nombre_patron }}</strong> en la bola {{ item.bola_esperada }}.
-                        {% endif %}
-                    </li>
-                    {% endfor %}
-                </ul>
+                </div>
             </section>
-            {% endif %}
-
-            {{ tarjetas_ganadores(resumen) }}
-
-            <div class="zona-descarga">
-                <p>¿Deseas descargar el PDF de los cartones?</p>
-                <a href="{{ url_for('descargar', token=token) }}" class="btn-descargar">
-                    Sí, descargar {{ nombre_base }}.pdf
-                </a>
-            </div>
-
-            <div class="ms-acciones-siguiente flujo-acciones-paso">
-                {% if sesion.secuencias_completadas < sesion.total_secuencias %}
-                <form method="POST" action="{{ url_for('multisecuencia_paso', token=token) }}">
-                    <input type="hidden" name="accion" value="continuar">
-                    <button type="submit" class="btn-flujo-principal btn-ms-siguiente">
-                        Continuar a secuencia {{ proxima_secuencia }} →
-                    </button>
-                </form>
-                {% else %}
-                <form method="POST" action="{{ url_for('multisecuencia_paso', token=token) }}">
-                    <input type="hidden" name="accion" value="continuar">
-                    <button type="submit" class="btn-flujo-principal btn-ms-siguiente">
-                        Ver resumen final →
-                    </button>
-                </form>
-                {% endif %}
-            </div>
             {% endif %}
         </div>
     </div>
 
     <script>
+        /** Crea la cuadrícula táctil 5×5 para marcar un patrón */
         function crearCuadriculaPatronMs(contenedorId, hiddenId) {
             const contenedor = document.getElementById(contenedorId);
             const hidden = document.getElementById(hiddenId);
@@ -235,6 +240,7 @@
             sincronizarPatronesMs();
         }
 
+        /** Sincroniza las celdas marcadas con los campos ocultos del formulario */
         function sincronizarPatronesMs() {
             function leerGrid(gridId, hiddenId) {
                 const grid = document.getElementById(gridId);
@@ -254,9 +260,23 @@
             leerGrid('grid-patron2-ms', 'patron2_celdas_ms');
         }
 
+        /** Cuenta bolas válidas en el textarea para guiar al usuario */
+        function actualizarContadorBolasMs() {
+            const textarea = document.getElementById('secuencia_numeros_ms');
+            const contador = document.getElementById('ms-contador-bolas');
+            if (!textarea || !contador) return;
+            const partes = textarea.value.split(/[,\s]+/).filter(Boolean);
+            const numeros = partes.filter(p => /^\d+$/.test(p));
+            contador.textContent = numeros.length + ' / 75 bolas ingresadas';
+            contador.classList.toggle('completo', numeros.length === 75);
+            contador.classList.toggle('incompleto', numeros.length > 0 && numeros.length !== 75);
+        }
+
         document.getElementById('form-secuencia-ms')?.addEventListener('submit', sincronizarPatronesMs);
+        document.getElementById('secuencia_numeros_ms')?.addEventListener('input', actualizarContadorBolasMs);
         crearCuadriculaPatronMs('grid-patron1-ms', 'patron1_celdas_ms');
         crearCuadriculaPatronMs('grid-patron2-ms', 'patron2_celdas_ms');
+        actualizarContadorBolasMs();
     </script>
 </body>
 </html>

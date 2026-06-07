@@ -1,30 +1,164 @@
-{# Tarjetas de ganadores (reutilizable en detectar, dirigido y multisecuencia) #}
+{# Tarjetas de ganadores y mini-grillas de patrones (detectar, dirigido, multisecuencia) #}
+
+{# Mini cartón 5×5 para mostrar la forma del patrón en pantalla #}
+{% macro mini_grid_patron(celdas_str, etiqueta, nombre) %}
+    {% set lista_activas = celdas_str.split(';') if celdas_str else [] %}
+    <div class="ms-mini-patron">
+        <div class="ms-mini-patron-cabecera">
+            <span class="ms-mini-patron-etiqueta">{{ etiqueta }}</span>
+            <span class="ms-mini-patron-nombre">{{ nombre if nombre else 'Sin nombre' }}</span>
+        </div>
+        <div class="ms-mini-patron-grid" aria-hidden="true">
+            {% for fila in range(5) %}
+                {% for col in range(5) %}
+                    {% set clave = fila ~ ',' ~ col %}
+                    <span class="ms-mini-celda{% if fila == 2 and col == 2 %} centro{% elif clave in lista_activas %} activa{% endif %}"></span>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+{% endmacro %}
+
+{# Resumen visual de los dos patrones configurados + cartón lleno #}
+{% macro panel_patrones_secion(patrones) %}
+    {% if patrones %}
+    <div class="ms-panel-patrones-config">
+        <h4 class="ms-panel-patrones-titulo">Patrones configurados</h4>
+        <div class="ms-panel-patrones-grid">
+            {{ mini_grid_patron(patrones.patron2_celdas, 'Patrón 1', patrones.nombre_patron2) }}
+            {{ mini_grid_patron(patrones.patron1_celdas, 'Patrón 2', patrones.nombre_patron1) }}
+            <div class="ms-mini-patron ms-mini-patron-lleno">
+                <div class="ms-mini-patron-cabecera">
+                    <span class="ms-mini-patron-etiqueta">Cartón lleno</span>
+                    <span class="ms-mini-patron-nombre">Siempre activo</span>
+                </div>
+                <p class="ms-nota-lleno">Se evalúa en cada secuencia junto con los patrones marcados.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endmacro %}
+
+{# Bolas de la secuencia en chips legibles (colapsable en móvil) #}
+{% macro secuencia_bolas_chips(secuencia_texto, etiqueta='Secuencia de 75 bolas') %}
+    {% if secuencia_texto %}
+    <details class="ms-secuencia-bolas" open>
+        <summary class="ms-secuencia-bolas-resumen">
+            <span class="ms-secuencia-bolas-etiqueta">{{ etiqueta }}</span>
+            <span class="ms-secuencia-bolas-hint">Toca para expandir o contraer</span>
+        </summary>
+        <div class="ms-chips-bolas">
+            {% for bola in secuencia_texto.split(', ') %}
+            <span class="ms-chip-bola" title="Posición {{ loop.index }}">{{ bola }}</span>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+{% endmacro %}
+
+{# Resumen por secuencia al estilo detectar ganadores (tarjetas de patrones) #}
+{% macro resumen_secuencia_simple(entrada, nota_pdf=false) %}
+    <article class="ms-bloque-secuencia-resumen">
+        <header class="ms-encabezado-secuencia">
+            <div class="ms-encabezado-secuencia-izq">
+                <span class="ms-numero-secuencia-badge">{{ entrada.numero }}</span>
+                <div>
+                    <h3 class="ms-titulo-secuencia-resumen">Secuencia {{ entrada.numero }}</h3>
+                    <p class="ms-sub-secuencia-resumen">
+                        {{ entrada.resumen.total_cartones }} cartones analizados
+                    </p>
+                </div>
+            </div>
+            <span class="ms-etiqueta-tipo {% if entrada.tipo_generacion == 'dirigido' %}tipo-dirigido{% else %}tipo-detectar{% endif %}">
+                {% if entrada.tipo_generacion == 'dirigido' %}Dirigida{% else %}Detectar{% endif %}
+            </span>
+        </header>
+
+        {% if entrada.resumen.solo_designados %}
+        <p class="ayuda ms-nota-solo-designados">Solo se listan los cartones que elegiste en el asistente.</p>
+        {% endif %}
+
+        {% if entrada.verificacion_dirigida %}
+        <p class="ms-verificacion-linea {% if entrada.verificacion_dirigida.todos_ok %}ok{% else %}fallo{% endif %}">
+            {% if entrada.verificacion_dirigida.todos_ok %}
+            Verificacion dirigida: correcta.
+            {% else %}
+            Verificacion dirigida: revisa la configuracion (detalle en el PDF resumen).
+            {% endif %}
+        </p>
+        {% endif %}
+
+        {{ tarjetas_ganadores(entrada.resumen) }}
+
+        {% if nota_pdf %}
+        <p class="ms-nota-detalle-pdf">Bolas y patrones completos en el PDF resumen.</p>
+        {% endif %}
+    </article>
+{% endmacro %}
+
+{# Vista breve tras analizar una secuencia (el detalle va en el PDF) #}
+{% macro resumen_breve_multisecuencia(resumen) %}
+    {% set ganadores_count = resumen.patrones | selectattr('tiene_ganador') | list | length %}
+    <div class="ms-resumen-breve">
+        {% if resumen.hay_ganadores %}
+        <p class="ms-resumen-breve-titulo">Secuencia analizada correctamente</p>
+        <p class="ms-resumen-breve-detalle">
+            Se detectaron <strong>{{ ganadores_count }}</strong> patron{% if ganadores_count != 1 %}es{% endif %} con ganador.
+            El detalle completo (bolas, cartones y patrones) estara en el <strong>PDF resumen</strong> al finalizar.
+        </p>
+        <ul class="ms-resumen-breve-lista">
+            {% for patron in resumen.patrones %}
+            <li class="{% if patron.tiene_ganador %}item-gano{% else %}item-sin-gano{% endif %}">
+                <span class="ms-resumen-breve-patron">{{ patron.nombre }}</span>
+                <span class="ms-resumen-breve-estado">
+                    {% if patron.tiene_ganador %}Con ganador{% else %}Sin ganador{% endif %}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="ms-resumen-breve-titulo">Secuencia analizada</p>
+        <p class="ms-resumen-breve-detalle">
+            No hubo ganadores en esta secuencia. El informe completo se incluira en el PDF resumen.
+        </p>
+        {% endif %}
+    </div>
+{% endmacro %}
+
 {% macro tarjetas_ganadores(resumen) %}
     {% if resumen.hay_ganadores %}
-    <div class="lista-patrones">
+    <div class="lista-patrones lista-patrones-detallada">
         {% for patron in resumen.patrones %}
         <article class="tarjeta-patron {% if patron.tiene_ganador %}gano{% else %}no-gano{% endif %}">
-            <h3 class="nombre-patron">{{ patron.nombre }}</h3>
+            <div class="tarjeta-patron-cabecera">
+                <h3 class="nombre-patron">{{ patron.nombre }}</h3>
+                <span class="tarjeta-patron-estado {% if patron.tiene_ganador %}estado-gano{% else %}estado-sin-gano{% endif %}">
+                    {% if patron.tiene_ganador %}Ganador{% else %}Sin ganador{% endif %}
+                </span>
+            </div>
 
             {% if patron.tiene_ganador %}
-            <p class="etiqueta-bola-ganadora">Bola ganadora:</p>
-            <div class="bola-destacada">{{ patron.bola_etiqueta }}</div>
-            <p class="cartones-ganadores">
-                {% if patron.un_carton %}
-                Ganador: <strong>Cartón {{ patron.cartones[0] }}</strong>
-                {% else %}
-                Ganadores:
-                {% for c in patron.cartones %}
-                <strong>Cartón {{ c }}</strong>{% if not loop.last %}, {% endif %}
-                {% endfor %}
-                {% endif %}
-            </p>
-            <p class="posicion-secuencia">
-                (Posición {{ patron.bola_posicion }} en la secuencia)
-            </p>
+            <div class="tarjeta-patron-datos">
+                <div class="tarjeta-patron-bloque">
+                    <p class="etiqueta-dato">Bola ganadora</p>
+                    <div class="bola-destacada">{{ patron.bola_etiqueta }}</div>
+                </div>
+                <div class="tarjeta-patron-bloque">
+                    <p class="etiqueta-dato">Posición en la secuencia</p>
+                    <p class="valor-dato">Bola n.º {{ patron.bola_posicion }} de 75</p>
+                </div>
+                <div class="tarjeta-patron-bloque tarjeta-patron-bloque-ancho">
+                    <p class="etiqueta-dato">Cartón{% if not patron.un_carton %}es{% endif %} ganador{% if not patron.un_carton %}es{% endif %}</p>
+                    <p class="cartones-ganadores">
+                        {% for c in patron.cartones %}
+                        <span class="badge-carton">Cartón {{ c }}</span>
+                        {% endfor %}
+                    </p>
+                </div>
+            </div>
             {% else %}
             <p class="cartones-ganadores texto-sin-ganador">
-                Nadie ganó con esta forma en la secuencia indicada.
+                Nadie completó esta forma con la secuencia indicada.
             </p>
             {% endif %}
         </article>
@@ -32,7 +166,8 @@
     </div>
     {% else %}
     <div class="sin-ganadores-global">
-        No hubo ganadores con la secuencia y patrones configurados.
+        <span class="sin-ganadores-icono" aria-hidden="true">◎</span>
+        <p>No hubo ganadores con la secuencia y patrones configurados.</p>
     </div>
     {% endif %}
 {% endmacro %}

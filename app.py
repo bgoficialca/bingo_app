@@ -480,102 +480,366 @@ def nombre_base_multisecuencia(token):
     return sesion.get("nombre_base", NOMBRE_BASE_DEFAULT) if sesion else NOMBRE_BASE_DEFAULT
 
 
+def _pdf_texto_latin1(texto):
+    """Evita errores de fpdf2 con caracteres fuera de Latin-1 (tildes raras, emojis, etc.)."""
+    if texto is None:
+        return ""
+    return str(texto).encode("latin-1", errors="replace").decode("latin-1")
+
+
 def _pdf_texto_ancho(pdf, texto, altura=5, fuente=("Helvetica", "", 10)):
     """Escribe un párrafo usando todo el ancho útil (evita error de fpdf2 con ancho 0)."""
     pdf.set_font(*fuente)
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(pdf.epw, altura, texto)
+    pdf.multi_cell(pdf.epw, altura, _pdf_texto_latin1(texto))
+
+
+def _pdf_ms_color_hex(pdf, hex_color):
+    """Aplica un color RGB a partir de un valor hexadecimal (#RRGGBB)."""
+    limpio = (hex_color or "#000000").lstrip("#")
+    if len(limpio) != 6:
+        limpio = "000000"
+    pdf.set_fill_color(int(limpio[0:2], 16), int(limpio[2:4], 16), int(limpio[4:6], 16))
+
+
+def _pdf_ms_parsear_celdas_texto(texto):
+    """Convierte 'fila,col;fila,col' en un conjunto de coordenadas activas."""
+    activas = set()
+    if not texto:
+        return activas
+    for parte in texto.split(";"):
+        parte = parte.strip()
+        if "," not in parte:
+            continue
+        fila_txt, col_txt = parte.split(",", 1)
+        try:
+            activas.add((int(fila_txt), int(col_txt)))
+        except ValueError:
+            continue
+    return activas
+
+
+def _pdf_ms_dibujar_mini_patron(pdf, x, y, tam_celda, celdas_texto, titulo, subtitulo):
+    """
+    Dibuja una mini cuadrícula 5×5 del patrón en el PDF.
+    El centro libre (2,2) se marca en naranja; las celdas activas en verde.
+    """
+    ancho_total = tam_celda * 5
+    alto_cabecera = 14
+    pdf.set_xy(x, y)
+    _pdf_ms_color_hex(pdf, "#fff8f3")
+    pdf.set_draw_color(230, 230, 230)
+    pdf.rect(x, y, ancho_total + 8, alto_cabecera + ancho_total + 10, style="DF")
+
+    pdf.set_xy(x + 4, y + 3)
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_text_color(254, 99, 11)
+    pdf.cell(ancho_total, 4, _pdf_texto_latin1(titulo), ln=1)
+
+    pdf.set_x(x + 4)
+    pdf.set_font("Helvetica", "", 7)
+    pdf.set_text_color(80, 80, 80)
+    pdf.cell(ancho_total, 4, _pdf_texto_latin1(subtitulo or "Sin nombre"), ln=1)
+
+    origen_y = y + alto_cabecera
+    activas = _pdf_ms_parsear_celdas_texto(celdas_texto)
+    for fila in range(5):
+        for col in range(5):
+            cx = x + 4 + col * tam_celda
+            cy = origen_y + fila * tam_celda
+            if fila == 2 and col == 2:
+                _pdf_ms_color_hex(pdf, "#fe630b")
+            elif (fila, col) in activas:
+                _pdf_ms_color_hex(pdf, "#1b6b3a")
+            else:
+                _pdf_ms_color_hex(pdf, "#f0f0f0")
+            pdf.rect(cx, cy, tam_celda - 0.6, tam_celda - 0.6, style="F")
+
+    pdf.set_text_color(0, 0, 0)
+
+
+def _pdf_ms_bolas_en_lineas(pdf, secuencia_texto, bolas_por_linea=15):
+    """Parte la secuencia de 75 bolas en varias líneas legibles en el PDF."""
+    if not secuencia_texto:
+        return
+    numeros = [n.strip() for n in secuencia_texto.split(",") if n.strip()]
+    for inicio in range(0, len(numeros), bolas_por_linea):
+        trozo = numeros[inicio : inicio + bolas_por_linea]
+        etiqueta = f"Bolas {inicio + 1}-{inicio + len(trozo)}: "
+        _pdf_texto_ancho(
+            pdf,
+            etiqueta + ", ".join(trozo),
+            altura=4.5,
+            fuente=("Helvetica", "", 8),
+        )
+
+
+def _pdf_ms_encabezado_documento(pdf, nombre_base, sesion):
+    """Portada del informe con banda decorativa y datos generales."""
+    _pdf_ms_color_hex(pdf, "#fe630b")
+    pdf.rect(0, 0, 210, 28, style="F")
+
+    pdf.set_xy(15, 10)
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 10, "Resumen multisecuencia", ln=1)
+
+    pdf.set_x(15)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 6, _pdf_texto_latin1(f"Archivo: {nombre_base}.pdf"), ln=1)
+
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_xy(15, 34)
+
+    total_seq = sesion.get("total_secuencias", 0)
+    total_cartones = len(sesion.get("cartones", []))
+    _pdf_texto_ancho(
+        pdf,
+        f"Este informe resume {total_seq} secuencia(s) jugadas sobre el mismo PDF "
+        f"de {total_cartones} carton(es). Incluye patrones, bolas y ganadores por partida.",
+        altura=5,
+        fuente=("Helvetica", "", 10),
+    )
+    pdf.ln(2)
+
+    # Tabla resumen rápida
+    _pdf_ms_color_hex(pdf, "#f8f9fa")
+    pdf.set_draw_color(200, 200, 200)
+    y_tabla = pdf.get_y()
+    pdf.rect(15, y_tabla, 180, 22, style="DF")
+
+    pdf.set_xy(20, y_tabla + 4)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(55, 5, "Secuencias analizadas", ln=0)
+    pdf.cell(55, 5, "Cartones en PDF", ln=0)
+    pdf.cell(55, 5, "Nombre base", ln=1)
+
+    pdf.set_x(20)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(55, 6, str(total_seq), ln=0)
+    pdf.cell(55, 6, str(total_cartones), ln=0)
+    pdf.cell(55, 6, _pdf_texto_latin1(nombre_base), ln=1)
+    pdf.ln(8)
+
+
+def _pdf_ms_cabecera_secuencia(pdf, numero, tipo_generacion):
+    """Título de cada secuencia con banda lateral de color."""
+    if pdf.get_y() > 250:
+        pdf.add_page()
+        _pdf_ms_pie_pagina(pdf)
+
+    y = pdf.get_y()
+    _pdf_ms_color_hex(pdf, "#fe630b")
+    pdf.rect(15, y, 4, 14, style="F")
+
+    pdf.set_xy(22, y + 1)
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(30, 30, 30)
+    pdf.cell(0, 7, _pdf_texto_latin1(f"Secuencia {numero}"), ln=1)
+
+    if numero == 1:
+        tipo_txt = (
+            "Generacion sec. 1: modo dirigido"
+            if tipo_generacion == "dirigido"
+            else "Generacion sec. 1: detectar / cartones al azar"
+        )
+    else:
+        tipo_txt = "Analisis: detectar ganadores (mismos cartones del PDF)"
+    pdf.set_x(22)
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 5, _pdf_texto_latin1(tipo_txt), ln=1)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(3)
+
+
+def _pdf_ms_bloque_ganador(pdf, patron, es_ganador):
+    """Tarjeta de resultado por patrón dentro del PDF."""
+    y_inicio = pdf.get_y()
+    if y_inicio > 265:
+        pdf.add_page()
+        _pdf_ms_pie_pagina(pdf)
+        y_inicio = pdf.get_y()
+
+    alto = 16 if es_ganador else 10
+    color_fondo = "#e8f5ec" if es_ganador else "#f4f4f4"
+    color_borde = "#86c99a" if es_ganador else "#cccccc"
+    _pdf_ms_color_hex(pdf, color_fondo)
+    borde = color_borde.lstrip("#")
+    pdf.set_draw_color(int(borde[0:2], 16), int(borde[2:4], 16), int(borde[4:6], 16))
+    pdf.rect(18, y_inicio, 174, alto, style="DF")
+
+    pdf.set_xy(22, y_inicio + 3)
+    pdf.set_font("Helvetica", "B", 10)
+    if es_ganador:
+        pdf.set_text_color(27, 107, 58)
+    else:
+        pdf.set_text_color(80, 80, 80)
+    nombre = patron.get("nombre", "Patron")
+    estado = "GANADOR" if es_ganador else "Sin ganador"
+    pdf.cell(0, 5, _pdf_texto_latin1(f"{nombre}  -  {estado}"), ln=1)
+
+    if es_ganador:
+        cartones_txt = ", ".join(f"Carton {c}" for c in patron.get("cartones", []))
+        pdf.set_x(22)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(50, 50, 50)
+        pdf.cell(
+            0,
+            5,
+            _pdf_texto_latin1(
+                f"Bola: {patron.get('bola_etiqueta', '')}  |  "
+                f"Posicion {patron.get('bola_posicion', '')}/75  |  {cartones_txt}"
+            ),
+            ln=1,
+        )
+
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_y(y_inicio + alto + 3)
+
+
+def _pdf_ms_pie_pagina(pdf):
+    """Numeración y marca al pie de cada página del resumen."""
+    pdf.set_y(-12)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(150, 150, 150)
+    pdf.cell(
+        0,
+        8,
+        _pdf_texto_latin1(f"Resumen multisecuencia  -  Pagina {pdf.page_no()}"),
+        align="C",
+    )
+    pdf.set_text_color(0, 0, 0)
 
 
 def generar_pdf_resumen_multisecuencia(token, sesion):
     """
-    PDF informativo con todas las secuencias, patrones y ganadores.
-    No incluye los cartones; es un informe para consulta rápida.
+    PDF informativo detallado con todas las secuencias, mini-patrones y ganadores.
+    No incluye los cartones; es un informe visual para consulta y archivo.
     """
     nombre_base = sesion.get("nombre_base", NOMBRE_BASE_DEFAULT)
     pdf = FPDF("P", "mm", "A4")
-    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.set_margins(15, 15, 15)
     pdf.add_page()
-    _pdf_texto_ancho(pdf, f"Resumen multisecuencia - {nombre_base}", altura=10, fuente=("Helvetica", "B", 16))
-    _pdf_texto_ancho(
-        pdf,
-        f"Total de secuencias: {sesion.get('total_secuencias', 0)} | "
-        f"Cartones en el PDF: {len(sesion.get('cartones', []))}",
-        altura=8,
-    )
-    pdf.ln(4)
+
+    _pdf_ms_encabezado_documento(pdf, nombre_base, sesion)
 
     for entrada in sesion.get("secuencias", []):
         numero = entrada.get("numero", "?")
-        _pdf_texto_ancho(pdf, f"Secuencia {numero}", altura=9, fuente=("Helvetica", "B", 13))
         tipo = entrada.get("tipo_generacion", "detectar")
-        if numero == 1:
-            tipo_txt = (
-                "Generacion sec. 1: Dirigido"
-                if tipo == "dirigido"
-                else "Generacion sec. 1: Detectar / al azar"
-            )
-        else:
-            tipo_txt = "Analisis: detectar ganadores (mismo PDF de cartones)"
-        _pdf_texto_ancho(pdf, tipo_txt, altura=6)
-
         patrones = entrada.get("patrones", {})
-        if patrones.get("nombre_patron2"):
-            _pdf_texto_ancho(pdf, f"Patron 1: {patrones.get('nombre_patron2', '')}", altura=6)
-        if patrones.get("nombre_patron1"):
-            _pdf_texto_ancho(pdf, f"Patron 2: {patrones.get('nombre_patron1', '')}", altura=6)
-        _pdf_texto_ancho(pdf, "Carton lleno: siempre evaluado", altura=6)
-
         resumen = entrada.get("resumen", {})
-        bolas = resumen.get("secuencia_texto", "")
-        if len(bolas) > 120:
-            bolas = bolas[:120] + "..."
-        _pdf_texto_ancho(pdf, f"Bolas (75): {bolas}", altura=6)
+
+        _pdf_ms_cabecera_secuencia(pdf, numero, tipo)
+
+        # Mini-grillas de patrones (3 en fila si caben)
+        y_patrones = pdf.get_y()
+        tam = 5.5
+        _pdf_ms_dibujar_mini_patron(
+            pdf,
+            18,
+            y_patrones,
+            tam,
+            patrones.get("patron2_celdas", ""),
+            "Patron 1",
+            patrones.get("nombre_patron2", ""),
+        )
+        _pdf_ms_dibujar_mini_patron(
+            pdf,
+            18 + tam * 5 + 14,
+            y_patrones,
+            tam,
+            patrones.get("patron1_celdas", ""),
+            "Patron 2",
+            patrones.get("nombre_patron1", ""),
+        )
+
+        # Cartón lleno (caja informativa)
+        x_lleno = 18 + (tam * 5 + 14) * 2
+        _pdf_ms_color_hex(pdf, "#fff8e6")
+        pdf.set_draw_color(255, 213, 79)
+        pdf.rect(x_lleno, y_patrones, tam * 5 + 8, tam * 5 + 24, style="DF")
+        pdf.set_xy(x_lleno + 4, y_patrones + 6)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(180, 120, 0)
+        pdf.cell(tam * 5, 4, "Carton lleno", ln=1)
+        pdf.set_x(x_lleno + 4)
+        pdf.set_font("Helvetica", "", 7)
+        pdf.set_text_color(80, 80, 80)
+        pdf.multi_cell(tam * 5, 3.5, "Siempre evaluado en cada secuencia.")
+        pdf.set_text_color(0, 0, 0)
+
+        pdf.set_y(y_patrones + tam * 5 + 30)
         pdf.ln(2)
 
+        # Secuencia completa de bolas (sin truncar)
+        pdf.set_font("Helvetica", "B", 10)
+        _pdf_texto_ancho(pdf, "Secuencia de 75 bolas:", altura=6)
+        _pdf_ms_bolas_en_lineas(pdf, resumen.get("secuencia_texto", ""))
+        pdf.ln(3)
+
+        # Verificación modo dirigido (solo secuencia 1 si aplica)
         if entrada.get("verificacion_dirigida"):
             ver = entrada["verificacion_dirigida"]
-            estado = "OK" if ver.get("todos_ok") else "REVISAR"
-            _pdf_texto_ancho(
-                pdf,
-                f"Verificacion dirigida: {estado}",
-                altura=6,
-                fuente=("Helvetica", "B", 10),
-            )
+            estado = "VERIFICADO" if ver.get("todos_ok") else "REVISAR"
+            color_fondo = "#e8f5ec" if ver.get("todos_ok") else "#fdecea"
+            _pdf_ms_color_hex(pdf, color_fondo)
+            y_ver = pdf.get_y()
+            pdf.rect(18, y_ver, 174, 8 + len(ver.get("detalle", [])) * 5, style="DF")
+            pdf.set_xy(22, y_ver + 3)
+            pdf.set_font("Helvetica", "B", 10)
+            if ver.get("todos_ok"):
+                pdf.set_text_color(27, 107, 58)
+            else:
+                pdf.set_text_color(183, 28, 28)
+            pdf.cell(0, 5, _pdf_texto_latin1(f"Verificacion dirigida: {estado}"), ln=1)
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(60, 60, 60)
             for item in ver.get("detalle", []):
+                pdf.set_x(24)
                 if item.get("ok"):
                     linea = (
-                        f"Carton {item['carton']}: {item['nombre_patron']} "
-                        f"bola {item['bola_esperada']} (verificado)"
+                        f"[OK] Carton {item['carton']}: {item['nombre_patron']} "
+                        f"en bola {item['bola_esperada']}"
                     )
                 else:
                     linea = (
-                        f"Carton {item['carton']}: esperado {item['nombre_patron']} "
+                        f"[!!] Carton {item['carton']}: esperado {item['nombre_patron']} "
                         f"bola {item['bola_esperada']}"
                     )
                     if item.get("bola_real"):
-                        linea += f", simulacion bola {item['bola_real']}"
-                _pdf_texto_ancho(pdf, linea, altura=5, fuente=("Helvetica", "", 9))
+                        linea += f" (simulacion: bola {item['bola_real']})"
+                pdf.cell(0, 4.5, _pdf_texto_latin1(linea), ln=1)
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(4)
 
-        _pdf_texto_ancho(pdf, "Ganadores:", altura=7, fuente=("Helvetica", "B", 10))
-        for patron in resumen.get("patrones", []):
-            if patron.get("tiene_ganador"):
-                cartones_txt = ", ".join(
-                    f"Carton {c}" for c in patron.get("cartones", [])
-                )
-                _pdf_texto_ancho(
-                    pdf,
-                    f"{patron.get('nombre', '')}: {patron.get('bola_etiqueta', '')} "
-                    f"(bola {patron.get('bola_posicion', '')}) - {cartones_txt}",
-                    altura=5,
-                )
-            else:
-                _pdf_texto_ancho(
-                    pdf,
-                    f"{patron.get('nombre', '')}: sin ganador",
-                    altura=5,
-                )
-        pdf.ln(6)
+        # Resultados por patrón
+        pdf.set_font("Helvetica", "B", 11)
+        _pdf_texto_ancho(pdf, "Resultado por patron:", altura=7)
+        if resumen.get("hay_ganadores"):
+            for patron in resumen.get("patrones", []):
+                _pdf_ms_bloque_ganador(pdf, patron, patron.get("tiene_ganador"))
+        else:
+            _pdf_ms_color_hex(pdf, "#fff8e6")
+            y_sin = pdf.get_y()
+            pdf.rect(18, y_sin, 174, 12, style="DF")
+            pdf.set_xy(22, y_sin + 4)
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.set_text_color(100, 80, 0)
+            pdf.cell(
+                0,
+                5,
+                _pdf_texto_latin1(
+                    "No hubo ganadores con la secuencia y patrones configurados."
+                ),
+                ln=1,
+            )
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(6)
+
+        pdf.ln(4)
+        _pdf_ms_pie_pagina(pdf)
 
     ruta = ruta_resumen_multisecuencia(token)
     pdf.output(ruta)
@@ -3186,7 +3450,7 @@ def regenerar(token):
         return render_template(
             "index.html",
             error=str(error),
-        )
+    )
 
 
 @app.route("/descargar/<token>")
@@ -3322,10 +3586,12 @@ def multisecuencia_resumen_pdf(token):
     """Descarga el PDF resumen de todas las secuencias."""
     token = token_seguro(token)
     sesion = cargar_sesion_multisecuencia(token)
-    if not sesion or sesion.get("fase") != "final":
+    completadas = sesion.get("secuencias_completadas", 0) if sesion else 0
+    total = sesion.get("total_secuencias", 1) if sesion else 1
+    if not sesion or completadas < total:
         return render_template(
             "index.html",
-            error="El resumen no está disponible hasta completar todas las secuencias.",
+            error="El resumen PDF estara disponible cuando completes todas las secuencias.",
         )
     nombre_base = sesion.get("nombre_base", NOMBRE_BASE_DEFAULT)
     try:
@@ -3342,6 +3608,7 @@ def multisecuencia_resumen_pdf(token):
         )
     return send_file(
         ruta,
+        mimetype="application/pdf",
         as_attachment=True,
         download_name=f"{nombre_base}_resumen_secuencias.pdf",
     )

@@ -1,3 +1,4 @@
+{% from '_macro_navegacion.html' import boton_menu_principal %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='bingo.css') }}">
 </head>
 <body>
+    {{ boton_menu_principal() }}
     <div class="pagina">
         <header class="encabezado-app">
             <h1>Cartones de Bingo BG</h1>
@@ -86,49 +88,62 @@
                         <p class="resumen-paso-config-tiempo" id="resumen-tiempo-estimado"></p>
                     </div>
 
-                    <div id="bloque-config-normal" class="bloque-config-modo">
+                    <div id="bloque-config-normal" class="bloque-config-modo panel-modo-normal">
                         <p class="ayuda-bloque">No necesitas más datos aquí. Ya personalizaste colores y diseño; pulsa generar cuando quieras.</p>
                     </div>
 
-                    <div id="opciones-ganadores" class="opciones-ganadores bloque-config-modo">
+                    <div id="opciones-ganadores" class="opciones-ganadores bloque-config-modo panel-modo-detectar">
                         <h3>Detectar ganadores</h3>
                         <p class="ayuda">Secuencia cantada (números separados por coma):</p>
                         <textarea id="secuencia_numeros" class="textarea-secuencia"
                             placeholder="1, 2, 3, 35, 42, 71...">{{ form.secuencia_numeros if form else '' }}</textarea>
                     </div>
 
-                    <div id="opciones-multisecuencia" class="opciones-ganadores bloque-config-modo">
+                    <div id="opciones-multisecuencia" class="opciones-ganadores bloque-config-modo panel-modo-multisecuencia">
                         <h3>Multisecuencia</h3>
-                        <section class="reglas-dirigido">
-                            <p class="ayuda">Un solo PDF de cartones para varias partidas. La <strong>secuencia 1</strong> genera el PDF; las siguientes usan los mismos cartones con otras bolas y patrones.</p>
+                        <section class="reglas-dirigido ms-panel-config">
+                            <h4>¿Cómo funciona?</h4>
+                            <ol>
+                                <li><strong>Secuencia 1:</strong> generas un único PDF de cartones.</li>
+                                <li><strong>Secuencias 2…N:</strong> mismos cartones, nuevas bolas y patrones.</li>
+                                <li>Al final obtienes un <strong>resumen detallado</strong> con ganadores de cada partida.</li>
+                            </ol>
                         </section>
 
-                        <label for="multisecuencia_total">¿Cuántas secuencias usarás?</label>
-                        <select name="multisecuencia_total" id="multisecuencia_total">
-                            {% set mst = form.multisecuencia_total if form else '2' %}
-                            {% for n in range(1, 11) %}
-                            <option value="{{ n }}" {% if mst == n|string %}selected{% endif %}>{{ n }} secuencia{% if n > 1 %}s{% endif %}</option>
-                            {% endfor %}
-                        </select>
-
-                        <label class="check-linea ms-check-dirigido" for="multisecuencia_dirigido">
-                            <input type="checkbox" name="multisecuencia_dirigido" id="multisecuencia_dirigido"
-                                value="on" {% if form and form.multisecuencia_dirigido %}checked{% endif %}>
-                            <span class="check-linea-texto">Usar modo dirigido en la secuencia 1 (opcional)</span>
-                        </label>
-                        <p class="ayuda ayuda-opcion" id="ms-ayuda-seq1">Sin marcar: cartones al azar + detectar como en la secuencia 1.</p>
-
-                        <div id="ms-panel-dirigido" class="ms-subpanel" hidden>
-                            <p class="ayuda paso-dirigido"><strong>Secuencia 1 — modo dirigido</strong></p>
+                        <div class="ms-panel-config">
+                            <label for="multisecuencia_total">¿Cuántas secuencias jugarás?</label>
+                            <select name="multisecuencia_total" id="multisecuencia_total">
+                                {% set mst = form.multisecuencia_total if form else '2' %}
+                                {% for n in range(1, 11) %}
+                                <option value="{{ n }}" {% if mst == n|string %}selected{% endif %}>{{ n }} secuencia{% if n > 1 %}s{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                            <p class="ayuda ayuda-opcion">Cada secuencia puede tener patrones y bolas distintos.</p>
                         </div>
-                        <div id="ms-panel-detectar" class="ms-subpanel">
-                            <p class="ayuda"><strong>Secuencia 1 — detectar</strong> (75 bolas):</p>
+
+                        <div class="ms-panel-config">
+                            <label class="check-linea ms-check-dirigido" for="multisecuencia_dirigido">
+                                <input type="checkbox" name="multisecuencia_dirigido" id="multisecuencia_dirigido"
+                                    value="on" {% if form and form.multisecuencia_dirigido %}checked{% endif %}>
+                                <span class="check-linea-texto">Usar modo dirigido en la secuencia 1 (opcional)</span>
+                            </label>
+                            <p class="ayuda ayuda-opcion" id="ms-ayuda-seq1">Sin marcar: cartones al azar y detectar ganadores en la secuencia 1.</p>
+                        </div>
+
+                        <div id="ms-panel-dirigido" class="ms-subpanel ms-panel-config" hidden>
+                            <p class="ayuda paso-dirigido"><strong>Secuencia 1 — modo dirigido</strong></p>
+                            <p class="ayuda">Configura abajo el asistente y los patrones como en el modo dirigido normal.</p>
+                        </div>
+                        <div id="ms-panel-detectar" class="ms-subpanel ms-panel-config">
+                            <p class="ayuda"><strong>Secuencia 1 — detectar ganadores</strong></p>
+                            <label for="secuencia_numeros_ms">Secuencia de 75 bolas</label>
                             <textarea id="secuencia_numeros_ms" class="textarea-secuencia"
-                                placeholder="1, 2, 3, ... (75 números)">{{ form.secuencia_numeros if form else '' }}</textarea>
+                                placeholder="1, 2, 3, ... (75 números del 1 al 75)">{{ form.secuencia_numeros if form else '' }}</textarea>
+                            <p class="ayuda ayuda-opcion">También define los patrones en el panel de abajo antes de iniciar.</p>
                         </div>
                     </div>
 
-                    <div id="opciones-dirigido" class="opciones-ganadores bloque-config-modo">
+                    <div id="opciones-dirigido" class="opciones-ganadores bloque-config-modo panel-modo-dirigido">
                         <h3>Modo dirigido</h3>
 
                         <section class="reglas-dirigido" aria-label="Cómo funciona el asistente">
@@ -193,7 +208,7 @@
 
                         <div id="dirigido-setup-acciones" class="dirigido-setup-acciones">
                             <button type="button" class="btn-secundario" id="btn-iniciar-asistente">
-                                Iniciar asistente
+                                Abrir asistente de ganadores
                             </button>
                         </div>
 
@@ -203,20 +218,20 @@
                                 <h4 id="wizard-titulo-paso" class="wizard-titulo-paso"></h4>
                                 <p id="wizard-ayuda-paso" class="ayuda"></p>
 
-                                <label for="wizard-select-bola">Bola ganadora (elige una)</label>
+                                <label for="wizard-select-bola">1. ¿En qué bola gana este patrón?</label>
                                 <select id="wizard-select-bola" class="wizard-select-bola">
                                     <option value="">— Cargando bolas posibles —</option>
                                 </select>
 
                                 <div id="wizard-cartones-wrap" class="wizard-cartones-wrap" hidden>
                                     <div class="wizard-cartones-encabezado">
-                                        <p class="label-cartones-wizard">Elige cartón(es) ganador(es):</p>
+                                        <p class="label-cartones-wizard">2. Toca los cartones ganadores</p>
                                         <div class="wizard-cartones-toolbar">
-                                            <button type="button" class="btn-chip" id="wizard-seleccionar-todos">
-                                                Marcar todos
+                                            <button type="button" class="btn-chip btn-chip-principal" id="wizard-seleccionar-todos">
+                                                Seleccionar todos
                                             </button>
                                             <button type="button" class="btn-chip" id="wizard-seleccionar-ninguno">
-                                                Desmarcar
+                                                Quitar selección
                                             </button>
                                             <span id="wizard-contador-cartones" class="wizard-contador-cartones"></span>
                                         </div>
@@ -230,16 +245,16 @@
 
                             <div class="wizard-botones">
                                 <button type="button" class="btn-secundario" id="wizard-reiniciar">
-                                    Empezar de nuevo
+                                    Reiniciar asistente
                                 </button>
                                 <button type="button" class="btn-principal wizard-btn-siguiente" id="wizard-siguiente" disabled>
-                                    Siguiente
+                                    Confirmar y continuar
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div id="opciones-patrones" class="opciones-ganadores bloque-config-modo">
+                    <div id="opciones-patrones" class="opciones-ganadores bloque-config-modo panel-modo-detectar">
                         <h3>Patrones de ganar</h3>
                         <p class="ayuda">Marca las formas y ponles nombre. <strong>Cartón lleno</strong> siempre activo.</p>
 
@@ -526,15 +541,15 @@
             select.disabled = false;
             msg.textContent = data.mensaje || (
                 data.bolas.length
-                    ? 'Elige la bola. Luego verás qué cartones pueden ganar.'
+                    ? 'Primero elige la bola. Después aparecerán los cartones que pueden ganar.'
                     : ''
             );
 
-            document.getElementById('wizard-titulo-paso').textContent = paso.nombre;
+            document.getElementById('wizard-titulo-paso').textContent = 'Configurar: ' + paso.nombre;
             document.getElementById('wizard-ayuda-paso').textContent =
                 asistenteDirigido.indice === 0
-                    ? 'Elige bola y cartón(es). Solo aparecen opciones que se pueden generar en el PDF.'
-                    : 'Puedes repetir un cartón de un paso anterior. Solo se listan cartones viables.';
+                    ? 'Solo verás bolas y cartones que el PDF puede generar de verdad.'
+                    : 'Puedes repetir un cartón que ya ganó antes, si aparece disponible.';
 
             const previo = asistenteDirigido.seleccion[paso.clave];
             if (previo && previo.bola) {
@@ -545,6 +560,7 @@
                     if (ch) ch.checked = true;
                 });
                 actualizarContadorCartonesWizard();
+                actualizarEstiloCartonesWizard();
                 if ((previo.cartones || []).length) {
                     document.getElementById('wizard-siguiente').disabled = false;
                 }
@@ -559,6 +575,15 @@
             contador.textContent = total
                 ? marcados + ' de ' + total + ' seleccionados'
                 : '';
+            contador.classList.toggle('completo', total > 0 && marcados === total);
+        }
+
+        /** Resalta visualmente las tarjetas de cartón marcadas */
+        function actualizarEstiloCartonesWizard() {
+            document.querySelectorAll('.wizard-tarjeta-carton').forEach(label => {
+                const input = label.querySelector('.wizard-carton-check');
+                if (input) label.classList.toggle('seleccionado', input.checked);
+            });
         }
 
         function renderCartonesWizard(items) {
@@ -591,7 +616,7 @@
                 if (item.ganancias_previas && item.ganancias_previas.length) {
                     subtitulo.textContent = 'Ya ganó: ' + item.ganancias_previas.join(', ');
                 } else {
-                    subtitulo.textContent = 'Cartón ' + item.numero;
+                    subtitulo.textContent = 'Toca para seleccionar';
                 }
 
                 label.appendChild(input);
@@ -640,7 +665,7 @@
 
             renderCartonesWizard(items);
             msg.textContent = data.mensaje ||
-                'Marca cartón(es). Solo se fijan las casillas del patrón; el relleno va al final.';
+                'Toca uno o varios cartones. Los seleccionados se resaltan en verde.';
             document.getElementById('wizard-siguiente').disabled = true;
             actualizarContadorCartonesWizard();
         }
@@ -675,7 +700,7 @@
         async function mostrarPasoWizard() {
             renderProgresoWizard();
             const btnSig = document.getElementById('wizard-siguiente');
-            btnSig.textContent = 'Siguiente';
+            btnSig.textContent = 'Confirmar y continuar';
             if (asistenteDirigido.listo) {
                 btnSig.disabled = true;
                 return;
@@ -742,7 +767,7 @@
                 }
 
                 asistenteDirigido.listo = true;
-                msg.textContent = data.mensaje || 'Listo. Pulsa el botón de abajo para generar el PDF.';
+                msg.textContent = data.mensaje || 'Asistente completo. Ya puedes generar el PDF.';
                 btnSig.disabled = true;
                 btnSig.textContent = 'Completado';
                 renderProgresoWizard();
@@ -875,15 +900,22 @@
             actualizarUIPorModo();
         }
 
-        /** Ajusta textos visibles según el modo elegido */
+        /** Ajusta textos y acentos de color según el modo elegido */
         function actualizarUIPorModo() {
+            const modo = modoSeleccionado();
+            document.body.dataset.modoActivo = modo;
+
             const subtitulo = document.getElementById('subtitulo-paso-personalizar');
             const btnConfig = document.getElementById('btn-ir-configurar');
+            const etiqueta = document.getElementById('etiqueta-modo-activo');
             if (subtitulo) {
                 subtitulo.textContent = 'Colores, diseño y nombre del archivo. La vista previa se actualiza al instante.';
             }
             if (btnConfig) {
                 btnConfig.textContent = 'Configurar partida →';
+            }
+            if (etiqueta) {
+                etiqueta.className = 'flujo-etiqueta-modo etiqueta-modo-' + modo;
             }
         }
 
@@ -1402,6 +1434,7 @@
                 parseInt(document.getElementById('wizard-select-bola').value, 10);
             document.getElementById('wizard-siguiente').disabled = !ok;
             actualizarContadorCartonesWizard();
+            actualizarEstiloCartonesWizard();
         });
         document.getElementById('wizard-seleccionar-todos').addEventListener('click', () => {
             document.querySelectorAll('.wizard-carton-check:not(:disabled)').forEach(ch => {
@@ -1410,6 +1443,7 @@
             document.getElementById('wizard-siguiente').disabled =
                 !parseInt(document.getElementById('wizard-select-bola').value, 10);
             actualizarContadorCartonesWizard();
+            actualizarEstiloCartonesWizard();
         });
         document.getElementById('wizard-seleccionar-ninguno').addEventListener('click', () => {
             document.querySelectorAll('.wizard-carton-check').forEach(ch => {
@@ -1417,6 +1451,7 @@
             });
             document.getElementById('wizard-siguiente').disabled = true;
             actualizarContadorCartonesWizard();
+            actualizarEstiloCartonesWizard();
         });
 
         document.getElementById('total_cartones').addEventListener('input', () => {

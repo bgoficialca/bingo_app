@@ -1,4 +1,5 @@
 {% from '_macro_patrones.html' import tarjetas_ganadores %}
+{% from '_macro_navegacion.html' import boton_menu_principal %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,13 +8,17 @@
     <title>Resultados — {{ nombre_base }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='bingo.css') }}">
 </head>
-<body>
+<body class="{% if resumen.modo_dirigido %}pagina-modo-dirigido{% else %}pagina-modo-detectar{% endif %}">
+    {{ boton_menu_principal() }}
     <div class="pagina">
-        <header class="encabezado-app">
+        <header class="encabezado-app encabezado-resultados">
+            <p class="encabezado-resultados-etiqueta">
+                {% if resumen.modo_dirigido %}Modo dirigido{% else %}Detectar ganadores{% endif %}
+            </p>
             <h1>Resultados del bingo</h1>
         </header>
 
-        <div class="tarjeta resultados-cuerpo">
+        <div class="tarjeta resultados-cuerpo panel-resultados-modo">
             <h2 class="resumen-titulo">
                 {% if resumen.modo_dirigido %}Ganadores del modo dirigido{% else %}Ganadores encontrados{% endif %}
             </h2>

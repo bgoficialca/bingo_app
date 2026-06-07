@@ -1,0 +1,10 @@
+{# Botón fijo para volver al menú principal (todas las vistas) #}
+{% macro boton_menu_principal() %}
+<a href="{{ url_for('index') }}"
+    class="btn-menu-principal"
+    title="Volver al menú principal"
+    aria-label="Volver al menú principal"
+    onclick="return confirm('¿Volver al menú principal?\n\nSe perderá el progreso de esta partida (configuración, asistente y sesión multisecuencia).');">
+    <span class="btn-menu-principal-icono" aria-hidden="true">⌂</span>
+</a>
+{% endmacro %}
