@@ -107,12 +107,12 @@
                             {% endfor %}
                         </select>
 
-                        <label class="check-linea ms-check-dirigido">
+                        <label class="check-linea ms-check-dirigido" for="multisecuencia_dirigido">
                             <input type="checkbox" name="multisecuencia_dirigido" id="multisecuencia_dirigido"
                                 value="on" {% if form and form.multisecuencia_dirigido %}checked{% endif %}>
-                            Usar modo dirigido en la secuencia 1 (opcional)
+                            <span class="check-linea-texto">Usar modo dirigido en la secuencia 1 (opcional)</span>
                         </label>
-                        <p class="ayuda" id="ms-ayuda-seq1">Sin marcar: cartones al azar + detectar como en la secuencia 1.</p>
+                        <p class="ayuda ayuda-opcion" id="ms-ayuda-seq1">Sin marcar: cartones al azar + detectar como en la secuencia 1.</p>
 
                         <div id="ms-panel-dirigido" class="ms-subpanel" hidden>
                             <p class="ayuda paso-dirigido"><strong>Secuencia 1 — modo dirigido</strong></p>
@@ -137,17 +137,17 @@
                             placeholder="1, 5, 12, 18, ... (75 números del 1 al 75)">{{ form.secuencia_dirigida if form else '' }}</textarea>
 
                         <div class="dirigido-activar-patrones">
-                            <label class="check-linea">
+                            <label class="check-linea" for="activo_cuadro_dirigido">
                                 <input type="checkbox" class="patron-activo-check" data-patron="cuadro" id="activo_cuadro_dirigido">
-                                Usar Patrón 1 como ganador
+                                <span class="check-linea-texto">Usar Patrón 1 como ganador</span>
                             </label>
-                            <label class="check-linea">
+                            <label class="check-linea" for="activo_linea_dirigido">
                                 <input type="checkbox" class="patron-activo-check" data-patron="linea" id="activo_linea_dirigido">
-                                Usar Patrón 2 como ganador
+                                <span class="check-linea-texto">Usar Patrón 2 como ganador</span>
                             </label>
-                            <label class="check-linea">
+                            <label class="check-linea" for="activo_lleno_dirigido">
                                 <input type="checkbox" class="patron-activo-check" data-patron="lleno" id="activo_lleno_dirigido" checked>
-                                Usar cartón lleno como ganador
+                                <span class="check-linea-texto">Usar cartón lleno como ganador</span>
                             </label>
                         </div>
 
