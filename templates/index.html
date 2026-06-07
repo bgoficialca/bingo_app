@@ -44,7 +44,7 @@
             <section id="paso-modo" class="flujo-paso flujo-paso-activo" aria-labelledby="titulo-paso-modo">
                 <div class="tarjeta tarjeta-flujo tarjeta-seleccion-modo">
                     <h2 id="titulo-paso-modo" class="flujo-titulo-paso">¿Qué quieres hacer?</h2>
-                    <p class="flujo-subtitulo">Elige un modo. Luego personalizarás los cartones y configurarás la partida.</p>
+                    <p class="flujo-subtitulo">Toca un modo para continuar. Después personalizarás los cartones y configurarás la partida.</p>
                     <div class="grid-tarjetas-modo" role="group" aria-label="Modos de generación">
                         <button type="button" class="tarjeta-modo{% if modo == 'normal' %} seleccionada{% endif %}" data-modo="normal">
                             <span class="tarjeta-modo-icono">🎲</span>
@@ -65,12 +65,6 @@
                             <span class="tarjeta-modo-icono">📋</span>
                             <span class="tarjeta-modo-titulo">Multisecuencia</span>
                             <span class="tarjeta-modo-desc">Un PDF, varias partidas con distintas secuencias.</span>
-                        </button>
-                    </div>
-
-                    <div class="flujo-acciones flujo-acciones-centro">
-                        <button type="button" class="btn-flujo-principal" id="btn-continuar-modo" disabled>
-                            Continuar con este modo →
                         </button>
                     </div>
                 </div>
@@ -891,13 +885,19 @@
             return hidden ? hidden.value : 'normal';
         }
 
-        function seleccionarModoTarjeta(modo) {
+        /**
+         * Marca el modo activo. Si avanzar es true (toque del usuario), pasa al paso 2.
+         * En la carga inicial no avanza para no saltar el menú de modos.
+         */
+        function seleccionarModoTarjeta(modo, avanzar) {
             document.getElementById('modo_operacion_hidden').value = modo;
             document.querySelectorAll('.tarjeta-modo').forEach(t => {
                 t.classList.toggle('seleccionada', t.dataset.modo === modo);
             });
-            document.getElementById('btn-continuar-modo').disabled = false;
             actualizarUIPorModo();
+            if (avanzar) {
+                irAPaso(2);
+            }
         }
 
         /** Ajusta textos y acentos de color según el modo elegido */
@@ -1201,12 +1201,12 @@
             seleccionarModoTarjeta(
                 ['normal', 'detectar', 'dirigido', 'multisecuencia'].includes(modoInicial)
                     ? modoInicial
-                    : 'normal'
+                    : 'normal',
+                false
             );
             document.querySelectorAll('.tarjeta-modo').forEach(btn => {
-                btn.addEventListener('click', () => seleccionarModoTarjeta(btn.dataset.modo));
+                btn.addEventListener('click', () => seleccionarModoTarjeta(btn.dataset.modo, true));
             });
-            document.getElementById('btn-continuar-modo').addEventListener('click', () => irAPaso(2));
             document.getElementById('btn-ir-configurar').addEventListener('click', () => {
                 if (validarAntesDeConfigurar()) irAPaso(3);
             });
