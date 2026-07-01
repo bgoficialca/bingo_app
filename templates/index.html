@@ -7,7 +7,7 @@
     <title>Cartones de Bingo BG</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='bingo.css') }}">
 </head>
-<body>
+<body{% if es_master %} data-master="true"{% endif %}>
     {{ boton_menu_principal() }}
     <div class="pagina">
         <header class="encabezado-app">
@@ -407,7 +407,37 @@
         </form>
     </div>
 
+    <!-- Icono semi oculto: fijo al pie de la ventana, desbloquea modo master con PIN -->
+    <footer class="pie-acceso-master" id="pie-acceso-master">
+        <button type="button" class="btn-acceso-master" id="btn-acceso-master" aria-label="Mantenimiento" title="">○</button>
+    </footer>
+
+    <!-- Modal PIN master (discreto) -->
+    <div class="modal-acceso-master" id="modal-acceso-master" hidden role="dialog" aria-labelledby="titulo-modal-master" aria-modal="true">
+        <div class="modal-acceso-master-panel">
+            <h3 id="titulo-modal-master">Verificación</h3>
+            <p>Ingresa el código de mantenimiento.</p>
+            <input type="password" id="input-pin-master" autocomplete="off" maxlength="64" placeholder="••••••">
+            <div class="modal-acceso-master-acciones">
+                <button type="button" class="btn-flujo-atras" id="btn-cancelar-master">Cancelar</button>
+                <button type="button" class="btn-flujo-principal" id="btn-confirmar-master">Entrar</button>
+            </div>
+            <p class="ayuda" id="mensaje-pin-master" style="margin-top:10px;min-height:1.2em;"></p>
+        </div>
+    </div>
+
+    <!-- Overlay troll: simula bugs al intentar funciones avanzadas sin ser master -->
+    <div class="overlay-troll" id="overlay-troll" hidden aria-live="assertive">
+        <div class="overlay-troll-spinner" id="overlay-troll-spinner"></div>
+        <p class="overlay-troll-titulo" id="overlay-troll-titulo">Inicializando módulo…</p>
+        <div class="overlay-troll-log" id="overlay-troll-log"></div>
+        <button type="button" class="overlay-troll-boton" id="btn-cerrar-troll" hidden>Volver al inicio</button>
+    </div>
+
     <script>
+        /** true si el servidor confirmó sesión master (todas las funciones desbloqueadas) */
+        let esMaster = {{ 'true' if es_master else 'false' }};
+
         const RECURSOS_VERSION = {
             '1.0': { logo: "{{ url_for('static', filename='logo_v1.png') }}", watermark: "{{ url_for('static', filename='watermark_v1.png') }}" },
             '2.0': { logo: "{{ url_for('static', filename='logo_v2.png') }}", watermark: "{{ url_for('static', filename='watermark_v2.png') }}" },
@@ -880,6 +910,154 @@
 
         const flujoApp = { paso: 1 };
 
+        /** Modos que solo el usuario master puede usar de verdad */
+        const MODOS_SOLO_MASTER = ['detectar', 'dirigido', 'multisecuencia'];
+
+        /** Mensajes falsos de consola para el overlay troll */
+        const LOGS_TROLL = [
+            { tipo: 'err', texto: 'TypeError: Cannot read properties of undefined (reading \'ganadores\')' },
+            { tipo: 'warn', texto: 'Warning: módulo detectar_ganadores@2.1.0 no responde (timeout 30000ms)' },
+            { tipo: 'err', texto: 'Uncaught ReferenceError: secuenciaBuffer is not defined' },
+            { tipo: 'warn', texto: 'Deprecation: PatronEngine.sync() será removido en v4' },
+            { tipo: 'err', texto: 'Error 0x7F3A: heap corruption en bingo_core.dll' },
+            { tipo: 'warn', texto: 'Retry 3/3 — conexión con worker de patrones fallida' },
+            { tipo: 'err', texto: 'SyntaxError: Unexpected token \'}\' en config_dirigido.json' },
+            { tipo: 'warn', texto: 'Memory leak detectado en MultisecuenciaScheduler' }
+        ];
+
+        function modoRequiereMaster(modo) {
+            return MODOS_SOLO_MASTER.includes(modo);
+        }
+
+        /** Indica si el usuario actual puede usar el modo elegido */
+        function puedeUsarModo(modo) {
+            return esMaster || !modoRequiereMaster(modo);
+        }
+
+        /**
+         * Activa la pantalla troll: parece un bug real al intentar modos avanzados.
+         * @param {string} motivo - texto breve mostrado al usuario
+         */
+        function activarTroll(motivo) {
+            const overlay = document.getElementById('overlay-troll');
+            const log = document.getElementById('overlay-troll-log');
+            const titulo = document.getElementById('overlay-troll-titulo');
+            const spinner = document.getElementById('overlay-troll-spinner');
+            const btnCerrar = document.getElementById('btn-cerrar-troll');
+
+            document.body.classList.add('troll-activo');
+            overlay.hidden = false;
+            log.innerHTML = '';
+            titulo.textContent = motivo || 'Cargando módulo avanzado…';
+            spinner.hidden = false;
+            btnCerrar.hidden = true;
+
+            let indice = 0;
+            const intervaloLog = setInterval(() => {
+                if (indice >= LOGS_TROLL.length) return;
+                const entrada = LOGS_TROLL[indice++];
+                const linea = document.createElement('div');
+                linea.className = entrada.tipo;
+                linea.textContent = '> ' + entrada.texto;
+                log.appendChild(linea);
+                log.scrollTop = log.scrollHeight;
+            }, 420);
+
+            setTimeout(() => {
+                titulo.textContent = 'Algo salió mal. El módulo no pudo cargarse.';
+                spinner.hidden = true;
+            }, 2800);
+
+            setTimeout(() => {
+                clearInterval(intervaloLog);
+                const linea = document.createElement('div');
+                linea.className = 'err';
+                linea.textContent = '> FATAL: reinicio recomendado. Modo normal sigue disponible.';
+                log.appendChild(linea);
+                btnCerrar.hidden = false;
+            }, 3600);
+        }
+
+        function cerrarTroll() {
+            document.body.classList.remove('troll-activo');
+            document.getElementById('overlay-troll').hidden = true;
+            seleccionarModoTarjeta('normal', false);
+            irAPaso(1);
+        }
+
+        /** Parpadeo breve en la tarjeta de modo al seleccionar función restringida */
+        function parpadeoTarjetaTroll(modo) {
+            const tarjeta = document.querySelector('.tarjeta-modo[data-modo="' + modo + '"]');
+            if (!tarjeta) return;
+            tarjeta.classList.add('troll-parpadeo');
+            setTimeout(() => tarjeta.classList.remove('troll-parpadeo'), 500);
+        }
+
+        function inicializarAccesoMaster() {
+            const btn = document.getElementById('btn-acceso-master');
+            const modal = document.getElementById('modal-acceso-master');
+            const input = document.getElementById('input-pin-master');
+            const msg = document.getElementById('mensaje-pin-master');
+
+            btn.addEventListener('click', () => {
+                msg.textContent = '';
+                input.value = '';
+                modal.hidden = false;
+                input.focus();
+            });
+
+            document.getElementById('btn-cancelar-master').addEventListener('click', () => {
+                modal.hidden = true;
+            });
+
+            document.getElementById('btn-confirmar-master').addEventListener('click', async () => {
+                const pin = input.value.trim();
+                if (!pin) return;
+                try {
+                    const resp = await fetch("{{ url_for('api_acceso_master') }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ pin })
+                    });
+                    const data = await resp.json();
+                    if (data.ok) {
+                        esMaster = true;
+                        document.body.dataset.master = 'true';
+                        modal.hidden = true;
+                        window.location.reload();
+                    } else {
+                        msg.textContent = data.error || 'PIN incorrecto.';
+                    }
+                } catch (e) {
+                    msg.textContent = 'No se pudo verificar. Intenta de nuevo.';
+                }
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('btn-confirmar-master').click();
+                }
+                if (e.key === 'Escape') modal.hidden = true;
+            });
+
+            document.getElementById('btn-cerrar-troll').addEventListener('click', cerrarTroll);
+
+            // Interceptar APIs del asistente si alguien intenta llamarlas sin ser master
+            const fetchOriginal = window.fetch.bind(window);
+            window.fetch = function(url, opciones) {
+                const urlStr = typeof url === 'string' ? url : (url && url.url) || '';
+                if (!esMaster && urlStr.indexOf('/api/dirigido/') !== -1) {
+                    activarTroll('Sincronizando asistente dirigido…');
+                    return Promise.resolve(new Response(
+                        JSON.stringify({ error: 'ERR_MODULE_LOAD: 0x7F3A' }),
+                        { status: 503, headers: { 'Content-Type': 'application/json' } }
+                    ));
+                }
+                return fetchOriginal(url, opciones);
+            };
+        }
+
         function modoSeleccionado() {
             const hidden = document.getElementById('modo_operacion_hidden');
             return hidden ? hidden.value : 'normal';
@@ -896,6 +1074,9 @@
             });
             actualizarUIPorModo();
             if (avanzar) {
+                if (!puedeUsarModo(modo)) {
+                    parpadeoTarjetaTroll(modo);
+                }
                 irAPaso(2);
             }
         }
@@ -920,6 +1101,11 @@
         }
 
         function irAPaso(num) {
+            const modo = modoSeleccionado();
+            if (num === 3 && !puedeUsarModo(modo)) {
+                activarTroll('Inicializando «' + (ETIQUETAS_MODO[modo]?.etiqueta || modo) + '»…');
+                return;
+            }
             flujoApp.paso = num;
             PASOS_FLUJO.forEach((id, idx) => {
                 const el = document.getElementById(id);
@@ -1208,6 +1394,11 @@
                 btn.addEventListener('click', () => seleccionarModoTarjeta(btn.dataset.modo, true));
             });
             document.getElementById('btn-ir-configurar').addEventListener('click', () => {
+                const modo = modoSeleccionado();
+                if (!puedeUsarModo(modo)) {
+                    activarTroll('Preparando configuración avanzada…');
+                    return;
+                }
                 if (validarAntesDeConfigurar()) irAPaso(3);
             });
             document.getElementById('imagen_fondo').addEventListener('change', () => {
@@ -1481,6 +1672,12 @@
         });
 
         document.getElementById('form-bingo').addEventListener('submit', (e) => {
+            const modo = modoSeleccionado();
+            if (!puedeUsarModo(modo)) {
+                e.preventDefault();
+                activarTroll('Generando con módulo extendido…');
+                return;
+            }
             if (!validarAntesDeGenerar()) {
                 e.preventDefault();
                 return;
@@ -1520,6 +1717,7 @@
 
         toggleModos();
         inicializarFlujoUI();
+        inicializarAccesoMaster();
         actualizarAyudaPaginas();
         cargarCartonMuestra();
     </script>

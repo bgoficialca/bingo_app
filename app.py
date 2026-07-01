@@ -1,4 +1,6 @@
-from flask import Flask, redirect, render_template, request, send_file, url_for, jsonify
+from flask import Flask, redirect, render_template, request, send_file, url_for, jsonify, session
+from functools import wraps
+from datetime import timedelta
 from fpdf import FPDF
 from random import randint, sample, shuffle
 import json
@@ -10,6 +12,46 @@ import tempfile
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "bingo-bg-dev-key-change-in-produccion")
+app.permanent_session_lifetime = timedelta(days=30)
+
+# --- Sistema de acceso: general (por defecto) vs master (todas las funciones) ---
+ROL_MASTER = "master"
+PIN_MASTER = os.environ.get("BINGO_MASTER_PIN", "bingomaster2026")
+MODOS_SOLO_MASTER = frozenset({"detectar", "dirigido", "multisecuencia"})
+
+
+def es_usuario_master():
+    """True si la sesión actual tiene privilegios de usuario master."""
+    return session.get("rol") == ROL_MASTER
+
+
+def requiere_master(f):
+    """Decorador: bloquea rutas/APIs reservadas al usuario master."""
+
+    @wraps(f)
+    def envoltorio(*args, **kwargs):
+        if not es_usuario_master():
+            return jsonify(
+                {
+                    "error": "ERR_MODULE_LOAD: 0x7F3A — recurso no disponible",
+                    "bug": True,
+                }
+            ), 503
+        return f(*args, **kwargs)
+
+    return envoltorio
+
+
+def modo_requiere_master(modo_operacion):
+    """Indica si un modo de operación excede lo permitido al usuario general."""
+    return modo_operacion in MODOS_SOLO_MASTER
+
+
+@app.context_processor
+def inyectar_rol_usuario():
+    """Expone el rol en todas las plantillas sin repetir lógica."""
+    return {"es_master": es_usuario_master()}
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -3073,6 +3115,10 @@ def index():
         version = request.form.get("version", "1.0")
         detectar_ganadores_modo = request.form.get("detectar-ganadores") == "on"
         modo_operacion = request.form.get("modo_operacion", "normal")
+        # Usuario general: solo puede generar en modo normal (red de seguridad en servidor)
+        if modo_requiere_master(modo_operacion) and not es_usuario_master():
+            modo_operacion = "normal"
+            detectar_ganadores_modo = False
         if modo_operacion == "detectar":
             detectar_ganadores_modo = True
         nombre_base = resolver_nombre_base(request.form.get("nombre_archivo", ""))
@@ -3226,10 +3272,30 @@ def index():
         )
         return send_file(pdf_path, as_attachment=True, download_name=f"{nombre_base}.pdf")
 
-    return render_template("index.html")
+    return render_template("index.html", es_master=es_usuario_master())
+
+
+@app.route("/api/acceso-master", methods=["POST"])
+def api_acceso_master():
+    """Desbloquea el modo master con un PIN (icono semi oculto en la interfaz)."""
+    datos = request.get_json(silent=True) or {}
+    pin = str(datos.get("pin", "")).strip()
+    if pin and pin == PIN_MASTER:
+        session["rol"] = ROL_MASTER
+        session.permanent = True
+        return jsonify({"ok": True, "mensaje": "Acceso master activado."})
+    return jsonify({"ok": False, "error": "PIN incorrecto."}), 403
+
+
+@app.route("/api/acceso-master", methods=["DELETE"])
+def api_cerrar_master():
+    """Cierra la sesión master (opcional, para pruebas)."""
+    session.pop("rol", None)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/dirigido/opciones", methods=["POST"])
+@requiere_master
 def api_dirigido_opciones():
     """
     Asistente: devuelve bolas o cartones viables para el paso actual.
@@ -3327,6 +3393,7 @@ def api_dirigido_opciones():
 
 
 @app.route("/api/dirigido/pasos", methods=["POST"])
+@requiere_master
 def api_dirigido_pasos():
     """Devuelve la lista ordenada de pasos activos del asistente."""
     datos = request.get_json(silent=True) or {}
@@ -3357,6 +3424,7 @@ def api_dirigido_pasos():
 
 
 @app.route("/api/dirigido/validar-generacion", methods=["POST"])
+@requiere_master
 def api_dirigido_validar_generacion():
     """Comprueba que la configuración del asistente generará el PDF sin errores."""
     datos = request.get_json(silent=True) or {}
