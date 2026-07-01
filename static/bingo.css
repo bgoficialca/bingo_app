@@ -63,6 +63,7 @@ body {
 }
 
 .pagina {
+    position: relative;
     max-width: 1100px;
     margin: 0 auto;
     padding: 12px;
@@ -3269,54 +3270,49 @@ body {
     }
 }
 
-/* --- Acceso master semi oculto (marca al final / pie de pantalla) --- */
+/* --- Acceso master: arriba del todo, solo paso 1, super invisible, scroll lo oculta --- */
 .pie-acceso-master {
-    position: fixed;
-    bottom: max(6px, env(safe-area-inset-bottom, 0px));
-    left: 50%;
-    z-index: 50;
-    transform: translateX(-50%);
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
     margin: 0;
     padding: 0;
-    text-align: center;
     user-select: none;
-    pointer-events: none;
+}
+
+.pie-acceso-master[hidden] {
+    display: none !important;
 }
 
 .btn-acceso-master {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 16px;
+    height: 16px;
     padding: 0;
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.35);
-    color: rgba(0, 0, 0, 0.18);
-    font-size: 14px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: rgba(0, 0, 0, 0.04);
+    font-size: 8px;
     line-height: 1;
     cursor: pointer;
-    pointer-events: auto;
-    transition: color 0.2s, background 0.2s, border-color 0.2s, opacity 0.2s;
-    opacity: 0.55;
+    opacity: 0.35;
+    transition: opacity 0.25s, color 0.25s;
 }
 
 .btn-acceso-master:hover,
 .btn-acceso-master:focus-visible {
-    color: rgba(0, 0, 0, 0.55);
-    background: rgba(255, 255, 255, 0.85);
-    border-color: rgba(0, 0, 0, 0.12);
-    opacity: 1;
-    cursor: pointer;
+    color: rgba(0, 0, 0, 0.35);
+    opacity: 0.9;
     outline: none;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 body[data-master="true"] .btn-acceso-master {
-    color: rgba(45, 138, 91, 0.7);
-    border-color: rgba(45, 138, 91, 0.25);
-    opacity: 0.85;
+    color: rgba(45, 138, 91, 0.25);
+    opacity: 0.55;
 }
 
 /* Modal discreto para ingresar PIN master */

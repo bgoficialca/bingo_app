@@ -10,6 +10,10 @@
 <body{% if es_master %} data-master="true"{% endif %}>
     {{ boton_menu_principal() }}
     <div class="pagina">
+        <!-- Acceso master: arriba del todo, solo paso 1, casi invisible; scroll lo oculta -->
+        <footer class="pie-acceso-master" id="pie-acceso-master">
+            <button type="button" class="btn-acceso-master" id="btn-acceso-master" aria-label="Mantenimiento" title="">·</button>
+        </footer>
         <header class="encabezado-app">
             <h1>Cartones de Bingo BG</h1>
         </header>
@@ -406,11 +410,6 @@
             </section>
         </form>
     </div>
-
-    <!-- Icono semi oculto: fijo al pie de la ventana, desbloquea modo master con PIN -->
-    <footer class="pie-acceso-master" id="pie-acceso-master">
-        <button type="button" class="btn-acceso-master" id="btn-acceso-master" aria-label="Mantenimiento" title="">○</button>
-    </footer>
 
     <!-- Modal PIN master (discreto) -->
     <div class="modal-acceso-master" id="modal-acceso-master" hidden role="dialog" aria-labelledby="titulo-modal-master" aria-modal="true">
@@ -1107,6 +1106,9 @@
                 return;
             }
             flujoApp.paso = num;
+            // Botón master solo en pantalla principal (paso 1)
+            const pieMaster = document.getElementById('pie-acceso-master');
+            if (pieMaster) pieMaster.hidden = num !== 1;
             PASOS_FLUJO.forEach((id, idx) => {
                 const el = document.getElementById(id);
                 const activo = idx + 1 === num;
