@@ -268,6 +268,36 @@ def troll_esta_activo():
     return bool(cargar_admin_config().get("troll_activo", True))
 
 
+def _fuente_config_activa():
+    """Indica de dónde se leyó la config: upstash, disco o default."""
+    if _upstash_habilitado() and _probar_conexion_upstash().get("activo"):
+        if _leer_config_upstash() is not None:
+            return "upstash"
+        return "upstash_vacio"
+    if _leer_config_desde_disco() is not None:
+        return "disco"
+    return "default"
+
+
+def _probar_conexion_upstash():
+    """Prueba lectura/escritura en Upstash Redis (sin exponer secretos)."""
+    if not _upstash_habilitado():
+        return {
+            "activo": False,
+            "motivo": "Faltan UPSTASH_REDIS_REST_URL o UPSTASH_REDIS_REST_TOKEN",
+        }
+    ping = _upstash_request("GET", "/ping")
+    if not ping or ping.get("result") != "PONG":
+        return {"activo": False, "motivo": "Upstash no respondió PONG"}
+    clave_prueba = "bingo_bg_ping"
+    if not _upstash_request("POST", f"/set/{clave_prueba}/ok"):
+        return {"activo": False, "motivo": "No se pudo escribir en Upstash"}
+    lectura = _upstash_request("GET", f"/get/{clave_prueba}")
+    if not lectura or lectura.get("result") != "ok":
+        return {"activo": False, "motivo": "No se pudo leer desde Upstash"}
+    return {"activo": True, "motivo": "Conexión OK"}
+
+
 def cerrar_todas_las_sesiones_globales():
     """Invalida todas las sesiones admin activas incrementando el epoch global."""
     config = cargar_admin_config()
@@ -3610,7 +3640,27 @@ def validar_sesion_admin_en_cada_peticion():
 @app.route("/api/admin/config", methods=["GET"])
 def api_admin_config_get():
     """Devuelve la configuración global (siempre recargada del almacenamiento compartido)."""
-    return jsonify(cargar_admin_config())
+    config = cargar_admin_config()
+    config["_meta"] = {
+        "fuente": _fuente_config_activa(),
+        "redis": _probar_conexion_upstash(),
+    }
+    return jsonify(config)
+
+
+@app.route("/api/admin/redis-estado", methods=["GET"])
+def api_admin_redis_estado():
+    """Diagnóstico público: ¿Redis/Upstash está configurado y responde?"""
+    prueba = _probar_conexion_upstash()
+    return jsonify(
+        {
+            "ok": True,
+            "variables_configuradas": _upstash_habilitado(),
+            "redis_activo": prueba.get("activo", False),
+            "detalle": prueba.get("motivo", ""),
+            "fuente_config_actual": _fuente_config_activa(),
+        }
+    )
 
 
 @app.route("/api/admin/config", methods=["POST"])
