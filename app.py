@@ -119,17 +119,27 @@ def directorio_datos_app():
 CLAVE_UPSTASH_CONFIG = "bingo_bg_admin_config"
 
 
-def _upstash_habilitado():
-    """Upstash Redis REST (opcional): almacenamiento compartido entre instancias en Vercel."""
-    return bool(
-        os.environ.get("UPSTASH_REDIS_REST_URL")
-        and os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+def _obtener_upstash_url():
+    """URL REST de Upstash (nombre estándar o integración Vercel Redis)."""
+    return os.environ.get("UPSTASH_REDIS_REST_URL") or os.environ.get("KV_REST_API_URL")
+
+
+def _obtener_upstash_token():
+    """Token REST de Upstash (nombre estándar o integración Vercel Redis)."""
+    return (
+        os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+        or os.environ.get("KV_REST_API_TOKEN")
     )
 
 
+def _upstash_habilitado():
+    """Upstash Redis REST: soporta variables Upstash directas o plugin Vercel (KV_*)."""
+    return bool(_obtener_upstash_url() and _obtener_upstash_token())
+
+
 def _upstash_request(metodo, ruta_relativa, cuerpo=None):
-    base = os.environ["UPSTASH_REDIS_REST_URL"].rstrip("/")
-    token = os.environ["UPSTASH_REDIS_REST_TOKEN"]
+    base = _obtener_upstash_url().rstrip("/")
+    token = _obtener_upstash_token()
     url = f"{base}{ruta_relativa}"
     headers = {"Authorization": f"Bearer {token}"}
     datos = None
@@ -284,7 +294,7 @@ def _probar_conexion_upstash():
     if not _upstash_habilitado():
         return {
             "activo": False,
-            "motivo": "Faltan UPSTASH_REDIS_REST_URL o UPSTASH_REDIS_REST_TOKEN",
+            "motivo": "Faltan variables Redis (UPSTASH_* o KV_REST_API_*)",
         }
     ping = _upstash_request("GET", "/ping")
     if not ping or ping.get("result") != "PONG":
@@ -3659,6 +3669,12 @@ def api_admin_redis_estado():
             "redis_activo": prueba.get("activo", False),
             "detalle": prueba.get("motivo", ""),
             "fuente_config_actual": _fuente_config_activa(),
+            "variables_detectadas": {
+                "UPSTASH_REDIS_REST_URL": bool(os.environ.get("UPSTASH_REDIS_REST_URL")),
+                "UPSTASH_REDIS_REST_TOKEN": bool(os.environ.get("UPSTASH_REDIS_REST_TOKEN")),
+                "KV_REST_API_URL": bool(os.environ.get("KV_REST_API_URL")),
+                "KV_REST_API_TOKEN": bool(os.environ.get("KV_REST_API_TOKEN")),
+            },
         }
     )
 
