@@ -3377,6 +3377,29 @@ body[data-master="true"] .btn-acceso-master {
     color: var(--naranja);
 }
 
+.panel-admin-cerrar-todas {
+    border-color: #e8c4c4;
+    color: #8b3a3a;
+}
+
+.panel-admin-cerrar-todas:hover {
+    border-color: #c44;
+    color: #a22;
+    background: #fff5f5;
+}
+
+.panel-admin-ultimo-cambio {
+    width: 100%;
+    margin: 6px 0 0;
+    font-size: 0.76rem;
+    color: var(--sin);
+    text-align: center;
+}
+
+.panel-admin-ultimo-cambio[hidden] {
+    display: none !important;
+}
+
 /* Historial de funciones avanzadas (panel admin) */
 .panel-admin-historial {
     width: 100%;

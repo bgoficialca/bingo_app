@@ -27,10 +27,12 @@
                     {{ 'Generales limitados' if troll_activo else 'Acceso libre' }}
                 </span>
                 <button type="button" class="panel-admin-salir" id="btn-cerrar-sesion-master" title="Cerrar sesión admin">Salir</button>
+                <button type="button" class="panel-admin-salir panel-admin-cerrar-todas" id="btn-cerrar-todas-sesiones" title="Cierra todas las sesiones admin en todos los dispositivos">Cerrar sesiones</button>
             </div>
+            <p class="panel-admin-ultimo-cambio" id="panel-admin-ultimo-cambio" {% if not es_master %}hidden{% endif %}></p>
             <details class="panel-admin-historial" id="panel-admin-historial" {% if not es_master %}hidden{% endif %}>
                 <summary>Historial de funciones avanzadas <span class="panel-admin-historial-nota">(últimas 40)</span></summary>
-                <p class="panel-admin-historial-ayuda">Solo detectar, dirigido y multisecuencia. No incluye modo normal.</p>
+                <p class="panel-admin-historial-ayuda">Solo detectar, dirigido y multisecuencia. Horas en zona {{ zona_horaria_app }}.</p>
                 <ul class="lista-historial-admin" id="lista-historial-admin">
                     <li class="historial-vacio">Cargando…</li>
                 </ul>
@@ -1093,6 +1095,28 @@
         }
 
         /** Panel admin: toggle del modo bug y cierre de sesión master */
+        /** Sincroniza restricciones/bug con el servidor (persistencia del último admin) */
+        async function sincronizarConfigServidor() {
+            try {
+                const resp = await fetch("{{ url_for('api_admin_config_get') }}");
+                const config = await resp.json();
+                if (typeof config.troll_activo === 'boolean') {
+                    trollActivo = config.troll_activo;
+                    document.body.dataset.troll = trollActivo ? 'true' : 'false';
+                    const toggle = document.getElementById('toggle-troll-admin');
+                    const estado = document.getElementById('estado-troll-admin');
+                    if (toggle && esMaster) toggle.checked = trollActivo;
+                    if (estado && esMaster) {
+                        estado.textContent = trollActivo ? 'Generales limitados' : 'Acceso libre';
+                    }
+                }
+                const ultimo = document.getElementById('panel-admin-ultimo-cambio');
+                if (ultimo && esMaster && config.troll_actualizado) {
+                    ultimo.textContent = 'Restricciones actualizadas: ' + config.troll_actualizado;
+                }
+            } catch (e) { /* ignorar */ }
+        }
+
         /** Carga y pinta el historial de funciones avanzadas en el panel admin */
         async function cargarHistorialAdmin() {
             const lista = document.getElementById('lista-historial-admin');
@@ -1137,6 +1161,7 @@
             if (!panel || !esMaster || !toggle) return;
 
             panel.hidden = false;
+            sincronizarConfigServidor();
             cargarHistorialAdmin();
 
             toggle.addEventListener('change', async () => {
@@ -1171,7 +1196,24 @@
                     window.location.reload();
                 });
             }
+
+            const btnCerrarTodas = document.getElementById('btn-cerrar-todas-sesiones');
+            if (btnCerrarTodas) {
+                btnCerrarTodas.addEventListener('click', async () => {
+                    if (!confirm('¿Cerrar todas las sesiones admin activas en todos los dispositivos?')) return;
+                    try {
+                        await fetch("{{ url_for('api_admin_cerrar_sesiones') }}", { method: 'POST' });
+                    } catch (e) { /* ignorar */ }
+                    window.location.reload();
+                });
+            }
         }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                sincronizarConfigServidor();
+            }
+        });
 
         function modoSeleccionado() {
             const hidden = document.getElementById('modo_operacion_hidden');
@@ -1837,6 +1879,7 @@
         inicializarFlujoUI();
         inicializarAccesoMaster();
         inicializarPanelAdmin();
+        sincronizarConfigServidor();
         actualizarAyudaPaginas();
         cargarCartonMuestra();
     </script>

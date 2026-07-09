@@ -1,6 +1,7 @@
 from flask import Flask, redirect, render_template, request, send_file, url_for, jsonify, session
 from functools import wraps
 from datetime import timedelta, datetime
+from zoneinfo import ZoneInfo
 from fpdf import FPDF
 from random import randint, sample, shuffle
 import json
@@ -22,7 +23,17 @@ MODOS_SOLO_MASTER = frozenset({"detectar", "dirigido", "multisecuencia"})
 
 def es_usuario_master():
     """True si la sesión actual tiene privilegios de usuario master."""
+    _invalidar_sesion_si_epoch_obsoleto()
     return session.get("rol") == ROL_MASTER
+
+
+def _invalidar_sesion_si_epoch_obsoleto():
+    """Cierra la sesión admin si el epoch global cambió (cierre masivo de sesiones)."""
+    if session.get("rol") != ROL_MASTER:
+        return
+    epoch_config = int(cargar_admin_config().get("session_epoch", 1))
+    if int(session.get("session_epoch", 0)) != epoch_config:
+        session.clear()
 
 
 def requiere_master(f):
@@ -68,17 +79,51 @@ def inyectar_rol_usuario():
     return {
         "es_master": es_usuario_master(),
         "troll_activo": troll_esta_activo(),
+        "zona_horaria_app": ZONA_HORARIA_APP,
     }
 
 
 # --- Configuración global del admin (persistida en disco o memoria en serverless) ---
-CONFIG_ADMIN_DEFAULT = {"troll_activo": True}
+ZONA_HORARIA_APP = os.environ.get("BINGO_TIMEZONE", "America/Caracas")
+CONFIG_ADMIN_DEFAULT = {"troll_activo": True, "session_epoch": 2}
 _admin_config_memoria = dict(CONFIG_ADMIN_DEFAULT)
+
+
+def ahora_local():
+    """Hora actual en la zona configurada (por defecto America/Caracas, UTC-4)."""
+    try:
+        return datetime.now(ZoneInfo(ZONA_HORARIA_APP))
+    except Exception:
+        return datetime.now()
+
+
+def directorio_datos_app():
+    """Directorio writable para config admin e historial (local o temp en serverless)."""
+    base = os.path.dirname(os.path.abspath(__file__))
+    if os.environ.get("VERCEL") or os.environ.get("RENDER"):
+        ruta = os.path.join(tempfile.gettempdir(), "bingo_bg_data")
+    else:
+        ruta = os.path.join(base, "data")
+    try:
+        os.makedirs(ruta, exist_ok=True)
+    except OSError:
+        pass
+    return ruta
+
+
+def _persistir_json(ruta, datos):
+    """Escribe JSON en disco; si falla, la caché en memoria sigue vigente."""
+    try:
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "w", encoding="utf-8") as archivo:
+            json.dump(datos, archivo, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
 
 
 def ruta_archivo_admin_config():
     """Ruta del JSON donde se guarda la configuración del administrador."""
-    return os.path.join(BASE_DIR, "data", "admin_config.json")
+    return os.path.join(directorio_datos_app(), "admin_config.json")
 
 
 def cargar_admin_config():
@@ -93,6 +138,15 @@ def cargar_admin_config():
                     _admin_config_memoria.update(datos)
         except (OSError, json.JSONDecodeError, ValueError):
             pass
+    else:
+        env_troll = os.environ.get("BINGO_TROLL_ACTIVO")
+        if env_troll is not None:
+            _admin_config_memoria["troll_activo"] = env_troll.strip().lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            )
     return dict(_admin_config_memoria)
 
 
@@ -102,15 +156,11 @@ def guardar_admin_config(actualizacion):
     config = cargar_admin_config()
     if "troll_activo" in actualizacion:
         config["troll_activo"] = bool(actualizacion["troll_activo"])
+        config["troll_actualizado"] = ahora_local().strftime("%d/%m/%Y %H:%M:%S")
+    if "session_epoch" in actualizacion:
+        config["session_epoch"] = int(actualizacion["session_epoch"])
     _admin_config_memoria = config
-    ruta = ruta_archivo_admin_config()
-    try:
-        os.makedirs(os.path.dirname(ruta), exist_ok=True)
-        with open(ruta, "w", encoding="utf-8") as archivo:
-            json.dump(config, archivo)
-    except OSError:
-        # En Vercel/serverless el disco puede ser de solo lectura; queda en memoria.
-        pass
+    _persistir_json(ruta_archivo_admin_config(), config)
     return config
 
 
@@ -121,6 +171,22 @@ def troll_esta_activo():
     False: todos pueden usar todas las funciones.
     """
     return bool(cargar_admin_config().get("troll_activo", True))
+
+
+def cerrar_todas_las_sesiones_globales():
+    """Invalida todas las sesiones admin activas incrementando el epoch global."""
+    config = cargar_admin_config()
+    nuevo_epoch = int(config.get("session_epoch", 1)) + 1
+    return guardar_admin_config({"session_epoch": nuevo_epoch})
+
+
+def sincronizar_epoch_sesiones_al_arranque():
+    """Al desplegar, asegura epoch mínimo para cerrar sesiones admin antiguas."""
+    config = cargar_admin_config()
+    epoch_minimo = int(CONFIG_ADMIN_DEFAULT.get("session_epoch", 2))
+    epoch_actual = int(config.get("session_epoch", 1))
+    if epoch_actual < epoch_minimo:
+        guardar_admin_config({"session_epoch": epoch_minimo})
 
 
 # --- Historial de uso de funciones avanzadas (últimas 40 entradas) ---
@@ -135,7 +201,7 @@ _historial_uso_memoria = []
 
 def ruta_archivo_historial_uso():
     """Ruta del JSON con el historial de funciones no normales."""
-    return os.path.join(BASE_DIR, "data", "historial_uso.json")
+    return os.path.join(directorio_datos_app(), "historial_uso.json")
 
 
 def cargar_historial_uso():
@@ -158,13 +224,7 @@ def guardar_historial_uso(historial):
     global _historial_uso_memoria
     historial_recortado = list(historial)[:MAX_ENTRADAS_HISTORIAL]
     _historial_uso_memoria = historial_recortado
-    ruta = ruta_archivo_historial_uso()
-    try:
-        os.makedirs(os.path.dirname(ruta), exist_ok=True)
-        with open(ruta, "w", encoding="utf-8") as archivo:
-            json.dump(historial_recortado, archivo, ensure_ascii=False, indent=2)
-    except OSError:
-        pass
+    _persistir_json(ruta_archivo_historial_uso(), historial_recortado)
     return historial_recortado
 
 
@@ -176,12 +236,13 @@ def registrar_uso_funcion_avanzada(modo_operacion, total_cartones=None):
     modo = str(modo_operacion or "").strip().lower()
     if modo not in MODOS_SOLO_MASTER:
         return
-    ahora = datetime.now()
+    ahora = ahora_local()
     entrada = {
         "modo": modo,
         "etiqueta": ETIQUETAS_MODO_HISTORIAL.get(modo, modo),
         "fecha": ahora.strftime("%d/%m/%Y"),
         "hora": ahora.strftime("%H:%M:%S"),
+        "zona_horaria": ZONA_HORARIA_APP,
         "total_cartones": total_cartones,
         "usuario": "admin" if es_usuario_master() else "general",
     }
@@ -3425,7 +3486,9 @@ def api_acceso_master():
     datos = request.get_json(silent=True) or {}
     pin = str(datos.get("pin", "")).strip()
     if pin and pin == PIN_MASTER:
+        config = cargar_admin_config()
         session["rol"] = ROL_MASTER
+        session["session_epoch"] = int(config.get("session_epoch", 1))
         session.permanent = True
         return jsonify({"ok": True, "mensaje": "Acceso master activado."})
     return jsonify({"ok": False, "error": "PIN incorrecto."}), 403
@@ -3433,9 +3496,15 @@ def api_acceso_master():
 
 @app.route("/api/acceso-master", methods=["DELETE"])
 def api_cerrar_master():
-    """Cierra la sesión master (opcional, para pruebas)."""
-    session.pop("rol", None)
+    """Cierra la sesión master del navegador actual."""
+    session.clear()
     return jsonify({"ok": True})
+
+
+@app.before_request
+def validar_sesion_admin_en_cada_peticion():
+    """En cada request, expulsa sesiones admin con epoch obsoleto."""
+    _invalidar_sesion_si_epoch_obsoleto()
 
 
 @app.route("/api/admin/config", methods=["GET"])
@@ -3459,6 +3528,21 @@ def api_admin_config_post():
                 if config.get("troll_activo")
                 else "Restricciones desactivadas: todos pueden usar todas las funciones."
             ),
+        }
+    )
+
+
+@app.route("/api/admin/cerrar-sesiones", methods=["POST"])
+@requiere_sesion_admin
+def api_admin_cerrar_sesiones():
+    """Cierra todas las sesiones admin activas en todos los dispositivos."""
+    config = cerrar_todas_las_sesiones_globales()
+    session.clear()
+    return jsonify(
+        {
+            "ok": True,
+            "session_epoch": config.get("session_epoch"),
+            "mensaje": "Todas las sesiones admin fueron cerradas.",
         }
     )
 
@@ -3862,6 +3946,11 @@ def multisecuencia_resumen_pdf(token):
         as_attachment=True,
         download_name=f"{nombre_base}_resumen_secuencias.pdf",
     )
+
+
+# Al arrancar (gunicorn, vercel o python app.py): cargar config y cerrar sesiones admin antiguas
+sincronizar_epoch_sesiones_al_arranque()
+cargar_admin_config()
 
 
 if __name__ == "__main__":
