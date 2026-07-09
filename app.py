@@ -26,10 +26,13 @@ def es_usuario_master():
 
 
 def requiere_master(f):
-    """Decorador: bloquea rutas/APIs reservadas al usuario master."""
+    """Decorador: bloquea rutas/APIs reservadas mientras el modo bug esté activo."""
 
     @wraps(f)
     def envoltorio(*args, **kwargs):
+        # Bug desactivado = acceso libre para todos (sin restricciones de master)
+        if not troll_esta_activo():
+            return f(*args, **kwargs)
         if not es_usuario_master():
             return jsonify(
                 {
@@ -49,8 +52,63 @@ def modo_requiere_master(modo_operacion):
 
 @app.context_processor
 def inyectar_rol_usuario():
-    """Expone el rol en todas las plantillas sin repetir lógica."""
-    return {"es_master": es_usuario_master()}
+    """Expone el rol y la config global del admin en todas las plantillas."""
+    return {
+        "es_master": es_usuario_master(),
+        "troll_activo": troll_esta_activo(),
+    }
+
+
+# --- Configuración global del admin (persistida en disco o memoria en serverless) ---
+CONFIG_ADMIN_DEFAULT = {"troll_activo": True}
+_admin_config_memoria = dict(CONFIG_ADMIN_DEFAULT)
+
+
+def ruta_archivo_admin_config():
+    """Ruta del JSON donde se guarda la configuración del administrador."""
+    return os.path.join(BASE_DIR, "data", "admin_config.json")
+
+
+def cargar_admin_config():
+    """Lee la config del admin desde archivo; si falla, usa caché en memoria."""
+    global _admin_config_memoria
+    ruta = ruta_archivo_admin_config()
+    if os.path.isfile(ruta):
+        try:
+            with open(ruta, encoding="utf-8") as archivo:
+                datos = json.load(archivo)
+                if isinstance(datos, dict):
+                    _admin_config_memoria.update(datos)
+        except (OSError, json.JSONDecodeError, ValueError):
+            pass
+    return dict(_admin_config_memoria)
+
+
+def guardar_admin_config(actualizacion):
+    """Actualiza la config del admin y la persiste cuando el disco lo permite."""
+    global _admin_config_memoria
+    config = cargar_admin_config()
+    if "troll_activo" in actualizacion:
+        config["troll_activo"] = bool(actualizacion["troll_activo"])
+    _admin_config_memoria = config
+    ruta = ruta_archivo_admin_config()
+    try:
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "w", encoding="utf-8") as archivo:
+            json.dump(config, archivo)
+    except OSError:
+        # En Vercel/serverless el disco puede ser de solo lectura; queda en memoria.
+        pass
+    return config
+
+
+def troll_esta_activo():
+    """
+    Indica si el modo bug/restricciones está activo.
+    True: usuarios generales solo modo normal y ven el troll al intentar más.
+    False: todos pueden usar todas las funciones.
+    """
+    return bool(cargar_admin_config().get("troll_activo", True))
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -3115,8 +3173,12 @@ def index():
         version = request.form.get("version", "1.0")
         detectar_ganadores_modo = request.form.get("detectar-ganadores") == "on"
         modo_operacion = request.form.get("modo_operacion", "normal")
-        # Usuario general: solo puede generar en modo normal (red de seguridad en servidor)
-        if modo_requiere_master(modo_operacion) and not es_usuario_master():
+        # Usuario general: solo modo normal mientras el bug/restricciones estén activos
+        if (
+            troll_esta_activo()
+            and modo_requiere_master(modo_operacion)
+            and not es_usuario_master()
+        ):
             modo_operacion = "normal"
             detectar_ganadores_modo = False
         if modo_operacion == "detectar":
@@ -3292,6 +3354,31 @@ def api_cerrar_master():
     """Cierra la sesión master (opcional, para pruebas)."""
     session.pop("rol", None)
     return jsonify({"ok": True})
+
+
+@app.route("/api/admin/config", methods=["GET"])
+def api_admin_config_get():
+    """Devuelve la configuración global del admin (lectura pública para el frontend)."""
+    return jsonify(cargar_admin_config())
+
+
+@app.route("/api/admin/config", methods=["POST"])
+@requiere_master
+def api_admin_config_post():
+    """Permite al admin activar o desactivar el modo bug/troll."""
+    datos = request.get_json(silent=True) or {}
+    config = guardar_admin_config(datos)
+    return jsonify(
+        {
+            "ok": True,
+            "config": config,
+            "mensaje": (
+                "Restricciones activas: usuarios generales solo modo normal."
+                if config.get("troll_activo")
+                else "Restricciones desactivadas: todos pueden usar todas las funciones."
+            ),
+        }
+    )
 
 
 @app.route("/api/dirigido/opciones", methods=["POST"])

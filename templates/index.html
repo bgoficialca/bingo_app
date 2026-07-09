@@ -7,7 +7,7 @@
     <title>Cartones de Bingo BG</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='bingo.css') }}">
 </head>
-<body{% if es_master %} data-master="true"{% endif %}>
+<body{% if es_master %} data-master="true"{% endif %}{% if troll_activo %} data-troll="true"{% endif %}>
     {{ boton_menu_principal() }}
     <div class="pagina">
         <!-- Acceso master: arriba del todo, solo paso 1, casi invisible; scroll lo oculta -->
@@ -16,6 +16,18 @@
         </footer>
         <header class="encabezado-app">
             <h1>Cartones de Bingo BG</h1>
+            <!-- Panel admin: solo visible con sesión master -->
+            <div class="panel-admin-master" id="panel-admin-master" {% if not es_master %}hidden{% endif %}>
+                <span class="panel-admin-etiqueta">Admin</span>
+                <label class="panel-admin-toggle" for="toggle-troll-admin" title="Activo: solo admin usa funciones avanzadas (con bug). Inactivo: todos pueden usar todo.">
+                    <input type="checkbox" id="toggle-troll-admin" {% if troll_activo %}checked{% endif %}>
+                    <span class="panel-admin-toggle-texto">Restricciones + bug</span>
+                </label>
+                <span class="panel-admin-estado" id="estado-troll-admin">
+                    {{ 'Generales limitados' if troll_activo else 'Acceso libre' }}
+                </span>
+                <button type="button" class="panel-admin-salir" id="btn-cerrar-sesion-master" title="Cerrar sesión admin">Salir</button>
+            </div>
         </header>
 
         {% if error %}
@@ -436,6 +448,8 @@
     <script>
         /** true si el servidor confirmó sesión master (todas las funciones desbloqueadas) */
         let esMaster = {{ 'true' if es_master else 'false' }};
+        /** Config global: si está activo, usuarios generales ven el bug al intentar modos avanzados */
+        let trollActivo = {{ 'true' if troll_activo else 'false' }};
 
         const RECURSOS_VERSION = {
             '1.0': { logo: "{{ url_for('static', filename='logo_v1.png') }}", watermark: "{{ url_for('static', filename='watermark_v1.png') }}" },
@@ -928,8 +942,14 @@
             return MODOS_SOLO_MASTER.includes(modo);
         }
 
+        /** Indica si las restricciones para usuarios generales están activas */
+        function restriccionesActivas() {
+            return trollActivo;
+        }
+
         /** Indica si el usuario actual puede usar el modo elegido */
         function puedeUsarModo(modo) {
+            if (!restriccionesActivas()) return true;
             return esMaster || !modoRequiereMaster(modo);
         }
 
@@ -982,6 +1002,14 @@
             document.getElementById('overlay-troll').hidden = true;
             seleccionarModoTarjeta('normal', false);
             irAPaso(1);
+        }
+
+        /**
+         * Bloquea modos avanzados solo cuando las restricciones están activas.
+         * Muestra la pantalla troll (bug) al usuario general.
+         */
+        function bloquearAccesoRestringido(motivo) {
+            activarTroll(motivo);
         }
 
         /** Parpadeo breve en la tarjeta de modo al seleccionar función restringida */
@@ -1046,8 +1074,8 @@
             const fetchOriginal = window.fetch.bind(window);
             window.fetch = function(url, opciones) {
                 const urlStr = typeof url === 'string' ? url : (url && url.url) || '';
-                if (!esMaster && urlStr.indexOf('/api/dirigido/') !== -1) {
-                    activarTroll('Sincronizando asistente dirigido…');
+                if (restriccionesActivas() && !esMaster && urlStr.indexOf('/api/dirigido/') !== -1) {
+                    bloquearAccesoRestringido('Sincronizando asistente dirigido…');
                     return Promise.resolve(new Response(
                         JSON.stringify({ error: 'ERR_MODULE_LOAD: 0x7F3A' }),
                         { status: 503, headers: { 'Content-Type': 'application/json' } }
@@ -1055,6 +1083,49 @@
                 }
                 return fetchOriginal(url, opciones);
             };
+        }
+
+        /** Panel admin: toggle del modo bug y cierre de sesión master */
+        function inicializarPanelAdmin() {
+            const panel = document.getElementById('panel-admin-master');
+            const toggle = document.getElementById('toggle-troll-admin');
+            const estado = document.getElementById('estado-troll-admin');
+            if (!panel || !esMaster || !toggle) return;
+
+            panel.hidden = false;
+
+            toggle.addEventListener('change', async () => {
+                const activo = toggle.checked;
+                try {
+                    const resp = await fetch("{{ url_for('api_admin_config_post') }}", {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ troll_activo: activo })
+                    });
+                    const data = await resp.json();
+                    if (data.ok && data.config) {
+                        trollActivo = !!data.config.troll_activo;
+                        document.body.dataset.troll = trollActivo ? 'true' : 'false';
+                        if (estado) {
+                            estado.textContent = trollActivo ? 'Generales limitados' : 'Acceso libre';
+                        }
+                    } else {
+                        toggle.checked = !activo;
+                    }
+                } catch (e) {
+                    toggle.checked = !activo;
+                }
+            });
+
+            const btnSalir = document.getElementById('btn-cerrar-sesion-master');
+            if (btnSalir) {
+                btnSalir.addEventListener('click', async () => {
+                    try {
+                        await fetch("{{ url_for('api_cerrar_master') }}", { method: 'DELETE' });
+                    } catch (e) { /* ignorar */ }
+                    window.location.reload();
+                });
+            }
         }
 
         function modoSeleccionado() {
@@ -1073,7 +1144,7 @@
             });
             actualizarUIPorModo();
             if (avanzar) {
-                if (!puedeUsarModo(modo)) {
+                if (!puedeUsarModo(modo) && restriccionesActivas()) {
                     parpadeoTarjetaTroll(modo);
                 }
                 irAPaso(2);
@@ -1102,7 +1173,7 @@
         function irAPaso(num) {
             const modo = modoSeleccionado();
             if (num === 3 && !puedeUsarModo(modo)) {
-                activarTroll('Inicializando «' + (ETIQUETAS_MODO[modo]?.etiqueta || modo) + '»…');
+                bloquearAccesoRestringido('Inicializando «' + (ETIQUETAS_MODO[modo]?.etiqueta || modo) + '»…');
                 return;
             }
             flujoApp.paso = num;
@@ -1398,7 +1469,7 @@
             document.getElementById('btn-ir-configurar').addEventListener('click', () => {
                 const modo = modoSeleccionado();
                 if (!puedeUsarModo(modo)) {
-                    activarTroll('Preparando configuración avanzada…');
+                    bloquearAccesoRestringido('Preparando configuración avanzada…');
                     return;
                 }
                 if (validarAntesDeConfigurar()) irAPaso(3);
@@ -1677,7 +1748,7 @@
             const modo = modoSeleccionado();
             if (!puedeUsarModo(modo)) {
                 e.preventDefault();
-                activarTroll('Generando con módulo extendido…');
+                bloquearAccesoRestringido('Generando con módulo extendido…');
                 return;
             }
             if (!validarAntesDeGenerar()) {
@@ -1720,6 +1791,7 @@
         toggleModos();
         inicializarFlujoUI();
         inicializarAccesoMaster();
+        inicializarPanelAdmin();
         actualizarAyudaPaginas();
         cargarCartonMuestra();
     </script>

@@ -7,3 +7,4 @@ carpeta_descargas/
 .env
 .venv/
 venv/
+data/admin_config.json

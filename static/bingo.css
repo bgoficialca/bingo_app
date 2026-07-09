@@ -3315,6 +3315,68 @@ body[data-master="true"] .btn-acceso-master {
     opacity: 0.55;
 }
 
+/* --- Panel admin (solo sesión master) --- */
+.panel-admin-master {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 12px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(45, 138, 91, 0.08);
+    border: 1px solid rgba(45, 138, 91, 0.2);
+    font-size: 0.82rem;
+}
+
+.panel-admin-master[hidden] {
+    display: none !important;
+}
+
+.panel-admin-etiqueta {
+    font-weight: 600;
+    color: var(--ok);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+}
+
+.panel-admin-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.panel-admin-toggle input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--ok);
+    cursor: pointer;
+}
+
+.panel-admin-estado {
+    color: var(--sin);
+    font-size: 0.78rem;
+}
+
+.panel-admin-salir {
+    padding: 4px 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    color: #444;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.panel-admin-salir:hover {
+    border-color: var(--naranja);
+    color: var(--naranja);
+}
+
 /* Modal discreto para ingresar PIN master */
 .modal-acceso-master {
     position: fixed;
