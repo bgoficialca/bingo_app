@@ -76,10 +76,12 @@ def modo_requiere_master(modo_operacion):
 @app.context_processor
 def inyectar_rol_usuario():
     """Expone el rol y la config global del admin en todas las plantillas."""
+    es_master = es_usuario_master()
     return {
-        "es_master": es_usuario_master(),
+        "es_master": es_master,
         "troll_activo": troll_esta_activo(),
         "zona_horaria_app": ZONA_HORARIA_APP,
+        "historial_admin": cargar_historial_uso() if es_master else [],
     }
 
 
@@ -128,7 +130,7 @@ def ruta_archivo_admin_config():
 
 def cargar_admin_config():
     """Lee la config del admin desde archivo; si falla, usa caché en memoria."""
-    global _admin_config_memoria
+    global _admin_config_memoria, _historial_uso_memoria
     ruta = ruta_archivo_admin_config()
     if os.path.isfile(ruta):
         try:
@@ -136,6 +138,10 @@ def cargar_admin_config():
                 datos = json.load(archivo)
                 if isinstance(datos, dict):
                     _admin_config_memoria.update(datos)
+                    # Historial embebido en el mismo JSON (más fiable en serverless)
+                    historial = datos.get("historial_uso")
+                    if isinstance(historial, list):
+                        _historial_uso_memoria = historial[:MAX_ENTRADAS_HISTORIAL]
         except (OSError, json.JSONDecodeError, ValueError):
             pass
     else:
@@ -154,6 +160,9 @@ def guardar_admin_config(actualizacion):
     """Actualiza la config del admin y la persiste cuando el disco lo permite."""
     global _admin_config_memoria
     config = cargar_admin_config()
+    # Conservar historial al actualizar otras claves
+    if "historial_uso" not in config:
+        config["historial_uso"] = list(_historial_uso_memoria)
     if "troll_activo" in actualizacion:
         config["troll_activo"] = bool(actualizacion["troll_activo"])
         config["troll_actualizado"] = ahora_local().strftime("%d/%m/%Y %H:%M:%S")
@@ -205,26 +214,34 @@ def ruta_archivo_historial_uso():
 
 
 def cargar_historial_uso():
-    """Lee el historial desde disco o devuelve la caché en memoria."""
+    """Lee el historial desde admin_config.json, archivo legado o caché en memoria."""
     global _historial_uso_memoria
-    ruta = ruta_archivo_historial_uso()
-    if os.path.isfile(ruta):
+    cargar_admin_config()
+    if _historial_uso_memoria:
+        return list(_historial_uso_memoria)
+    # Migrar archivo legado si existía por separado
+    ruta_legado = ruta_archivo_historial_uso()
+    if os.path.isfile(ruta_legado):
         try:
-            with open(ruta, encoding="utf-8") as archivo:
+            with open(ruta_legado, encoding="utf-8") as archivo:
                 datos = json.load(archivo)
-                if isinstance(datos, list):
+                if isinstance(datos, list) and datos:
                     _historial_uso_memoria = datos[:MAX_ENTRADAS_HISTORIAL]
+                    guardar_historial_uso(_historial_uso_memoria)
         except (OSError, json.JSONDecodeError, ValueError):
             pass
     return list(_historial_uso_memoria)
 
 
 def guardar_historial_uso(historial):
-    """Persiste el historial (máximo 40 entradas, las más recientes primero)."""
-    global _historial_uso_memoria
+    """Persiste el historial dentro de admin_config.json (máx. 40 entradas)."""
+    global _historial_uso_memoria, _admin_config_memoria
     historial_recortado = list(historial)[:MAX_ENTRADAS_HISTORIAL]
     _historial_uso_memoria = historial_recortado
-    _persistir_json(ruta_archivo_historial_uso(), historial_recortado)
+    config = cargar_admin_config()
+    config["historial_uso"] = historial_recortado
+    _admin_config_memoria = config
+    _persistir_json(ruta_archivo_admin_config(), config)
     return historial_recortado
 
 

@@ -34,7 +34,20 @@
                 <summary>Historial de funciones avanzadas <span class="panel-admin-historial-nota">(últimas 40)</span></summary>
                 <p class="panel-admin-historial-ayuda">Solo detectar, dirigido y multisecuencia. Horas en zona {{ zona_horaria_app }}.</p>
                 <ul class="lista-historial-admin" id="lista-historial-admin">
-                    <li class="historial-vacio">Cargando…</li>
+                    {% if historial_admin %}
+                        {% for entrada in historial_admin %}
+                        <li class="historial-item historial-modo-{{ entrada.modo }}">
+                            <span class="historial-fecha">{{ entrada.fecha }} {{ entrada.hora }}</span>
+                            <span class="historial-modo">{{ entrada.etiqueta }}</span>
+                            <span class="historial-meta">
+                                {{ 'Admin' if entrada.usuario == 'admin' else 'General' }}
+                                {% if entrada.total_cartones %} · {{ entrada.total_cartones }} cartón{% if entrada.total_cartones|int > 1 %}es{% endif %}{% endif %}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    {% else %}
+                        <li class="historial-vacio">Aún no hay usos registrados.</li>
+                    {% endif %}
                 </ul>
             </details>
         </header>
@@ -1125,7 +1138,13 @@
             if (bloque) bloque.hidden = false;
 
             try {
-                const resp = await fetch("{{ url_for('api_admin_historial') }}");
+                const resp = await fetch("{{ url_for('api_admin_historial') }}", {
+                    credentials: 'same-origin'
+                });
+                if (resp.status === 403) {
+                    lista.innerHTML = '<li class="historial-vacio">Sesión admin expirada. Vuelve a ingresar el PIN.</li>';
+                    return;
+                }
                 const data = await resp.json();
                 if (!data.ok || !Array.isArray(data.entradas)) {
                     lista.innerHTML = '<li class="historial-vacio">No se pudo cargar el historial.</li>';
@@ -1205,6 +1224,13 @@
                         await fetch("{{ url_for('api_admin_cerrar_sesiones') }}", { method: 'POST' });
                     } catch (e) { /* ignorar */ }
                     window.location.reload();
+                });
+            }
+
+            const bloqueHistorial = document.getElementById('panel-admin-historial');
+            if (bloqueHistorial) {
+                bloqueHistorial.addEventListener('toggle', () => {
+                    if (bloqueHistorial.open) cargarHistorialAdmin();
                 });
             }
         }
