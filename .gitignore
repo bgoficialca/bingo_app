@@ -8,3 +8,4 @@ carpeta_descargas/
 .venv/
 venv/
 data/admin_config.json
+data/historial_uso.json

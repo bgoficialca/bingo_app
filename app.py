@@ -1,6 +1,6 @@
 from flask import Flask, redirect, render_template, request, send_file, url_for, jsonify, session
 from functools import wraps
-from datetime import timedelta
+from datetime import timedelta, datetime
 from fpdf import FPDF
 from random import randint, sample, shuffle
 import json
@@ -40,6 +40,18 @@ def requiere_master(f):
                     "bug": True,
                 }
             ), 503
+        return f(*args, **kwargs)
+
+    return envoltorio
+
+
+def requiere_sesion_admin(f):
+    """Decorador: solo sesión admin (PIN), independiente del toggle de restricciones."""
+
+    @wraps(f)
+    def envoltorio(*args, **kwargs):
+        if not es_usuario_master():
+            return jsonify({"ok": False, "error": "Se requiere sesión admin."}), 403
         return f(*args, **kwargs)
 
     return envoltorio
@@ -109,6 +121,73 @@ def troll_esta_activo():
     False: todos pueden usar todas las funciones.
     """
     return bool(cargar_admin_config().get("troll_activo", True))
+
+
+# --- Historial de uso de funciones avanzadas (últimas 40 entradas) ---
+MAX_ENTRADAS_HISTORIAL = 40
+ETIQUETAS_MODO_HISTORIAL = {
+    "detectar": "Detectar ganadores",
+    "dirigido": "Modo dirigido",
+    "multisecuencia": "Multisecuencia",
+}
+_historial_uso_memoria = []
+
+
+def ruta_archivo_historial_uso():
+    """Ruta del JSON con el historial de funciones no normales."""
+    return os.path.join(BASE_DIR, "data", "historial_uso.json")
+
+
+def cargar_historial_uso():
+    """Lee el historial desde disco o devuelve la caché en memoria."""
+    global _historial_uso_memoria
+    ruta = ruta_archivo_historial_uso()
+    if os.path.isfile(ruta):
+        try:
+            with open(ruta, encoding="utf-8") as archivo:
+                datos = json.load(archivo)
+                if isinstance(datos, list):
+                    _historial_uso_memoria = datos[:MAX_ENTRADAS_HISTORIAL]
+        except (OSError, json.JSONDecodeError, ValueError):
+            pass
+    return list(_historial_uso_memoria)
+
+
+def guardar_historial_uso(historial):
+    """Persiste el historial (máximo 40 entradas, las más recientes primero)."""
+    global _historial_uso_memoria
+    historial_recortado = list(historial)[:MAX_ENTRADAS_HISTORIAL]
+    _historial_uso_memoria = historial_recortado
+    ruta = ruta_archivo_historial_uso()
+    try:
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "w", encoding="utf-8") as archivo:
+            json.dump(historial_recortado, archivo, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+    return historial_recortado
+
+
+def registrar_uso_funcion_avanzada(modo_operacion, total_cartones=None):
+    """
+    Registra en el historial el uso de detectar, dirigido o multisecuencia.
+    No registra el modo normal.
+    """
+    modo = str(modo_operacion or "").strip().lower()
+    if modo not in MODOS_SOLO_MASTER:
+        return
+    ahora = datetime.now()
+    entrada = {
+        "modo": modo,
+        "etiqueta": ETIQUETAS_MODO_HISTORIAL.get(modo, modo),
+        "fecha": ahora.strftime("%d/%m/%Y"),
+        "hora": ahora.strftime("%H:%M:%S"),
+        "total_cartones": total_cartones,
+        "usuario": "admin" if es_usuario_master() else "general",
+    }
+    historial = cargar_historial_uso()
+    historial.insert(0, entrada)
+    guardar_historial_uso(historial)
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -3199,6 +3278,7 @@ def index():
                 token = iniciar_multisecuencia_desde_form(
                     request.form, rutas_imagenes=rutas_imagenes
                 )
+                registrar_uso_funcion_avanzada("multisecuencia", total_cartones)
                 return redirect(url_for("multisecuencia_paso", token=token))
             except ValueError as error:
                 return render_template(
@@ -3282,6 +3362,7 @@ def index():
                 resumen["secuencia_texto"] = ", ".join(str(n) for n in secuencia_llamados)
 
                 token = publicar_pdf_temporal(pdf_path, nombre_base, resumen)
+                registrar_uso_funcion_avanzada("dirigido", total_generados)
                 return redirect(url_for("resultados", token=token))
 
             except ValueError as error:
@@ -3313,6 +3394,7 @@ def index():
                     resumen,
                     regenerar=_config_regenerar_detectar(request.form),
                 )
+                registrar_uso_funcion_avanzada("detectar", resumen.get("total_cartones"))
                 return redirect(url_for("resultados", token=token))
 
             except ValueError as error:
@@ -3363,7 +3445,7 @@ def api_admin_config_get():
 
 
 @app.route("/api/admin/config", methods=["POST"])
-@requiere_master
+@requiere_sesion_admin
 def api_admin_config_post():
     """Permite al admin activar o desactivar el modo bug/troll."""
     datos = request.get_json(silent=True) or {}
@@ -3377,6 +3459,19 @@ def api_admin_config_post():
                 if config.get("troll_activo")
                 else "Restricciones desactivadas: todos pueden usar todas las funciones."
             ),
+        }
+    )
+
+
+@app.route("/api/admin/historial", methods=["GET"])
+@requiere_sesion_admin
+def api_admin_historial():
+    """Devuelve las últimas 40 entradas de funciones avanzadas (solo admin)."""
+    return jsonify(
+        {
+            "ok": True,
+            "entradas": cargar_historial_uso(),
+            "maximo": MAX_ENTRADAS_HISTORIAL,
         }
     )
 

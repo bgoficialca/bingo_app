@@ -3377,6 +3377,94 @@ body[data-master="true"] .btn-acceso-master {
     color: var(--naranja);
 }
 
+/* Historial de funciones avanzadas (panel admin) */
+.panel-admin-historial {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid #e4e4e4;
+    text-align: left;
+    font-size: 0.82rem;
+}
+
+.panel-admin-historial[hidden] {
+    display: none !important;
+}
+
+.panel-admin-historial summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #333;
+    user-select: none;
+}
+
+.panel-admin-historial-nota {
+    font-weight: 400;
+    color: var(--sin);
+    font-size: 0.78rem;
+}
+
+.panel-admin-historial-ayuda {
+    margin: 8px 0 6px;
+    color: var(--sin);
+    font-size: 0.78rem;
+}
+
+.lista-historial-admin {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.historial-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 2px 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.historial-item:last-child {
+    border-bottom: none;
+}
+
+.historial-fecha {
+    grid-column: 1;
+    color: #444;
+    font-variant-numeric: tabular-nums;
+}
+
+.historial-modo {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    font-weight: 600;
+    color: var(--naranja);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.historial-meta {
+    grid-column: 1;
+    color: var(--sin);
+    font-size: 0.76rem;
+}
+
+.historial-vacio {
+    padding: 10px 0;
+    color: var(--sin);
+    font-style: italic;
+}
+
+.historial-modo-detectar .historial-modo { color: #4a90d9; }
+.historial-modo-dirigido .historial-modo { color: #7b5ea7; }
+.historial-modo-multisecuencia .historial-modo { color: #2d8a5b; }
+
 /* Modal discreto para ingresar PIN master */
 .modal-acceso-master {
     position: fixed;

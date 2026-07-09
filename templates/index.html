@@ -28,6 +28,13 @@
                 </span>
                 <button type="button" class="panel-admin-salir" id="btn-cerrar-sesion-master" title="Cerrar sesión admin">Salir</button>
             </div>
+            <details class="panel-admin-historial" id="panel-admin-historial" {% if not es_master %}hidden{% endif %}>
+                <summary>Historial de funciones avanzadas <span class="panel-admin-historial-nota">(últimas 40)</span></summary>
+                <p class="panel-admin-historial-ayuda">Solo detectar, dirigido y multisecuencia. No incluye modo normal.</p>
+                <ul class="lista-historial-admin" id="lista-historial-admin">
+                    <li class="historial-vacio">Cargando…</li>
+                </ul>
+            </details>
         </header>
 
         {% if error %}
@@ -1086,6 +1093,43 @@
         }
 
         /** Panel admin: toggle del modo bug y cierre de sesión master */
+        /** Carga y pinta el historial de funciones avanzadas en el panel admin */
+        async function cargarHistorialAdmin() {
+            const lista = document.getElementById('lista-historial-admin');
+            const bloque = document.getElementById('panel-admin-historial');
+            if (!lista || !esMaster) return;
+            if (bloque) bloque.hidden = false;
+
+            try {
+                const resp = await fetch("{{ url_for('api_admin_historial') }}");
+                const data = await resp.json();
+                if (!data.ok || !Array.isArray(data.entradas)) {
+                    lista.innerHTML = '<li class="historial-vacio">No se pudo cargar el historial.</li>';
+                    return;
+                }
+                if (!data.entradas.length) {
+                    lista.innerHTML = '<li class="historial-vacio">Aún no hay usos registrados.</li>';
+                    return;
+                }
+                lista.innerHTML = '';
+                data.entradas.forEach(entrada => {
+                    const item = document.createElement('li');
+                    item.className = 'historial-item historial-modo-' + (entrada.modo || 'otro');
+                    const cartones = entrada.total_cartones
+                        ? ' · ' + entrada.total_cartones + ' cartón' + (entrada.total_cartones > 1 ? 'es' : '')
+                        : '';
+                    const usuario = entrada.usuario === 'admin' ? 'Admin' : 'General';
+                    item.innerHTML =
+                        '<span class="historial-fecha">' + entrada.fecha + ' ' + entrada.hora + '</span>' +
+                        '<span class="historial-modo">' + (entrada.etiqueta || entrada.modo) + '</span>' +
+                        '<span class="historial-meta">' + usuario + cartones + '</span>';
+                    lista.appendChild(item);
+                });
+            } catch (e) {
+                lista.innerHTML = '<li class="historial-vacio">Error al cargar historial.</li>';
+            }
+        }
+
         function inicializarPanelAdmin() {
             const panel = document.getElementById('panel-admin-master');
             const toggle = document.getElementById('toggle-troll-admin');
@@ -1093,6 +1137,7 @@
             if (!panel || !esMaster || !toggle) return;
 
             panel.hidden = false;
+            cargarHistorialAdmin();
 
             toggle.addEventListener('change', async () => {
                 const activo = toggle.checked;
