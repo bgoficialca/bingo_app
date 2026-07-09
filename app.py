@@ -10,6 +10,9 @@ import re
 import secrets
 import shutil
 import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "bingo-bg-dev-key-change-in-produccion")
@@ -100,9 +103,9 @@ def ahora_local():
 
 
 def directorio_datos_app():
-    """Directorio writable para config admin e historial (local o temp en serverless)."""
+    """Directorio para config admin. En Vercel usa temp; en Render/local usa data/ del proyecto."""
     base = os.path.dirname(os.path.abspath(__file__))
-    if os.environ.get("VERCEL") or os.environ.get("RENDER"):
+    if os.environ.get("VERCEL"):
         ruta = os.path.join(tempfile.gettempdir(), "bingo_bg_data")
     else:
         ruta = os.path.join(base, "data")
@@ -111,6 +114,64 @@ def directorio_datos_app():
     except OSError:
         pass
     return ruta
+
+
+CLAVE_UPSTASH_CONFIG = "bingo_bg_admin_config"
+
+
+def _upstash_habilitado():
+    """Upstash Redis REST (opcional): almacenamiento compartido entre instancias en Vercel."""
+    return bool(
+        os.environ.get("UPSTASH_REDIS_REST_URL")
+        and os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+    )
+
+
+def _upstash_request(metodo, ruta_relativa, cuerpo=None):
+    base = os.environ["UPSTASH_REDIS_REST_URL"].rstrip("/")
+    token = os.environ["UPSTASH_REDIS_REST_TOKEN"]
+    url = f"{base}{ruta_relativa}"
+    headers = {"Authorization": f"Bearer {token}"}
+    datos = None
+    if cuerpo is not None:
+        datos = cuerpo.encode("utf-8") if isinstance(cuerpo, str) else cuerpo
+    req = urllib.request.Request(url, data=datos, method=metodo, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+        return None
+
+
+def _leer_config_upstash():
+    if not _upstash_habilitado():
+        return None
+    respuesta = _upstash_request("GET", f"/get/{CLAVE_UPSTASH_CONFIG}")
+    if not respuesta or respuesta.get("result") in (None, ""):
+        return None
+    raw = respuesta["result"]
+    try:
+        config = json.loads(raw) if isinstance(raw, str) else raw
+        return config if isinstance(config, dict) else None
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+def _escribir_config_upstash(config):
+    if not _upstash_habilitado():
+        return False
+    payload = json.dumps(config, ensure_ascii=False)
+    ruta = f"/set/{CLAVE_UPSTASH_CONFIG}/{urllib.parse.quote(payload, safe='')}"
+    respuesta = _upstash_request("POST", ruta)
+    return bool(respuesta and respuesta.get("result") == "OK")
+
+
+def _troll_desde_entorno():
+    """Valor por defecto de restricciones si no hay config guardada."""
+    env = os.environ.get("BINGO_TROLL_ACTIVO")
+    if env is not None:
+        return env.strip().lower() in ("1", "true", "yes", "on")
+    return bool(CONFIG_ADMIN_DEFAULT["troll_activo"])
 
 
 def _persistir_json(ruta, datos):
@@ -128,39 +189,65 @@ def ruta_archivo_admin_config():
     return os.path.join(directorio_datos_app(), "admin_config.json")
 
 
-def cargar_admin_config():
-    """Lee la config del admin desde archivo; si falla, usa caché en memoria."""
+def _config_con_defaults():
+    """Config base cuando aún no existe ningún guardado."""
+    return {
+        "troll_activo": _troll_desde_entorno(),
+        "session_epoch": int(CONFIG_ADMIN_DEFAULT.get("session_epoch", 2)),
+        "historial_uso": [],
+    }
+
+
+def _aplicar_config_en_memoria(config):
+    """Actualiza caché en memoria e historial embebido."""
     global _admin_config_memoria, _historial_uso_memoria
+    _admin_config_memoria = dict(config)
+    historial = config.get("historial_uso")
+    if isinstance(historial, list):
+        _historial_uso_memoria = historial[:MAX_ENTRADAS_HISTORIAL]
+
+
+def _leer_config_desde_disco():
     ruta = ruta_archivo_admin_config()
-    if os.path.isfile(ruta):
-        try:
-            with open(ruta, encoding="utf-8") as archivo:
-                datos = json.load(archivo)
-                if isinstance(datos, dict):
-                    _admin_config_memoria.update(datos)
-                    # Historial embebido en el mismo JSON (más fiable en serverless)
-                    historial = datos.get("historial_uso")
-                    if isinstance(historial, list):
-                        _historial_uso_memoria = historial[:MAX_ENTRADAS_HISTORIAL]
-        except (OSError, json.JSONDecodeError, ValueError):
-            pass
-    else:
-        env_troll = os.environ.get("BINGO_TROLL_ACTIVO")
-        if env_troll is not None:
-            _admin_config_memoria["troll_activo"] = env_troll.strip().lower() in (
-                "1",
-                "true",
-                "yes",
-                "on",
-            )
+    if not os.path.isfile(ruta):
+        return None
+    try:
+        with open(ruta, encoding="utf-8") as archivo:
+            datos = json.load(archivo)
+        return datos if isinstance(datos, dict) else None
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+
+
+def _persistir_config_completa(config):
+    """Guarda en Upstash (si hay), disco y memoria."""
+    _aplicar_config_en_memoria(config)
+    _escribir_config_upstash(config)
+    _persistir_json(ruta_archivo_admin_config(), config)
+
+
+def cargar_admin_config():
+    """
+    Lee config siempre desde almacenamiento compartido (Upstash > disco > defaults).
+    Evita que recargas en distintas instancias de Vercel devuelvan valores distintos.
+    """
+    config_upstash = _leer_config_upstash()
+    if config_upstash:
+        _aplicar_config_en_memoria(config_upstash)
+        return dict(_admin_config_memoria)
+
+    config_disco = _leer_config_desde_disco()
+    if config_disco:
+        _aplicar_config_en_memoria(config_disco)
+        return dict(_admin_config_memoria)
+
+    _aplicar_config_en_memoria(_config_con_defaults())
     return dict(_admin_config_memoria)
 
 
 def guardar_admin_config(actualizacion):
-    """Actualiza la config del admin y la persiste cuando el disco lo permite."""
-    global _admin_config_memoria
+    """Actualiza y persiste la config admin en todos los almacenes disponibles."""
     config = cargar_admin_config()
-    # Conservar historial al actualizar otras claves
     if "historial_uso" not in config:
         config["historial_uso"] = list(_historial_uso_memoria)
     if "troll_activo" in actualizacion:
@@ -168,9 +255,8 @@ def guardar_admin_config(actualizacion):
         config["troll_actualizado"] = ahora_local().strftime("%d/%m/%Y %H:%M:%S")
     if "session_epoch" in actualizacion:
         config["session_epoch"] = int(actualizacion["session_epoch"])
-    _admin_config_memoria = config
-    _persistir_json(ruta_archivo_admin_config(), config)
-    return config
+    _persistir_config_completa(config)
+    return dict(_admin_config_memoria)
 
 
 def troll_esta_activo():
@@ -234,14 +320,11 @@ def cargar_historial_uso():
 
 
 def guardar_historial_uso(historial):
-    """Persiste el historial dentro de admin_config.json (máx. 40 entradas)."""
-    global _historial_uso_memoria, _admin_config_memoria
+    """Persiste el historial dentro de admin_config (máx. 40 entradas)."""
     historial_recortado = list(historial)[:MAX_ENTRADAS_HISTORIAL]
-    _historial_uso_memoria = historial_recortado
     config = cargar_admin_config()
     config["historial_uso"] = historial_recortado
-    _admin_config_memoria = config
-    _persistir_json(ruta_archivo_admin_config(), config)
+    _persistir_config_completa(config)
     return historial_recortado
 
 
@@ -3526,7 +3609,7 @@ def validar_sesion_admin_en_cada_peticion():
 
 @app.route("/api/admin/config", methods=["GET"])
 def api_admin_config_get():
-    """Devuelve la configuración global del admin (lectura pública para el frontend)."""
+    """Devuelve la configuración global (siempre recargada del almacenamiento compartido)."""
     return jsonify(cargar_admin_config())
 
 

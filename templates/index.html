@@ -472,6 +472,8 @@
         let esMaster = {{ 'true' if es_master else 'false' }};
         /** Config global: si está activo, usuarios generales ven el bug al intentar modos avanzados */
         let trollActivo = {{ 'true' if troll_activo else 'false' }};
+        /** Evita que recargas pisen el toggle justo después de cambiarlo manualmente */
+        let ignorarSyncTrollHasta = 0;
 
         const RECURSOS_VERSION = {
             '1.0': { logo: "{{ url_for('static', filename='logo_v1.png') }}", watermark: "{{ url_for('static', filename='watermark_v1.png') }}" },
@@ -1110,15 +1112,21 @@
         /** Panel admin: toggle del modo bug y cierre de sesión master */
         /** Sincroniza restricciones/bug con el servidor (persistencia del último admin) */
         async function sincronizarConfigServidor() {
+            if (Date.now() < ignorarSyncTrollHasta) return;
             try {
-                const resp = await fetch("{{ url_for('api_admin_config_get') }}");
+                const resp = await fetch(
+                    "{{ url_for('api_admin_config_get') }}?t=" + Date.now(),
+                    { cache: 'no-store', credentials: 'same-origin' }
+                );
                 const config = await resp.json();
                 if (typeof config.troll_activo === 'boolean') {
                     trollActivo = config.troll_activo;
                     document.body.dataset.troll = trollActivo ? 'true' : 'false';
                     const toggle = document.getElementById('toggle-troll-admin');
                     const estado = document.getElementById('estado-troll-admin');
-                    if (toggle && esMaster) toggle.checked = trollActivo;
+                    if (toggle && esMaster && Date.now() >= ignorarSyncTrollHasta) {
+                        toggle.checked = trollActivo;
+                    }
                     if (estado && esMaster) {
                         estado.textContent = trollActivo ? 'Generales limitados' : 'Acceso libre';
                     }
@@ -1180,15 +1188,16 @@
             if (!panel || !esMaster || !toggle) return;
 
             panel.hidden = false;
-            sincronizarConfigServidor();
             cargarHistorialAdmin();
 
             toggle.addEventListener('change', async () => {
                 const activo = toggle.checked;
+                ignorarSyncTrollHasta = Date.now() + 5000;
                 try {
                     const resp = await fetch("{{ url_for('api_admin_config_post') }}", {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
                         body: JSON.stringify({ troll_activo: activo })
                     });
                     const data = await resp.json();
@@ -1200,9 +1209,11 @@
                         }
                     } else {
                         toggle.checked = !activo;
+                        trollActivo = toggle.checked;
                     }
                 } catch (e) {
                     toggle.checked = !activo;
+                    trollActivo = toggle.checked;
                 }
             });
 
@@ -1235,11 +1246,14 @@
             }
         }
 
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                sincronizarConfigServidor();
-            }
-        });
+        // Solo usuarios no-admin sincronizan al volver a la pestaña (el admin ya ve el estado en HTML)
+        if (!esMaster) {
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    sincronizarConfigServidor();
+                }
+            });
+        }
 
         function modoSeleccionado() {
             const hidden = document.getElementById('modo_operacion_hidden');
@@ -1905,7 +1919,7 @@
         inicializarFlujoUI();
         inicializarAccesoMaster();
         inicializarPanelAdmin();
-        sincronizarConfigServidor();
+        if (!esMaster) sincronizarConfigServidor();
         actualizarAyudaPaginas();
         cargarCartonMuestra();
     </script>
